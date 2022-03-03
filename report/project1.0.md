@@ -5,7 +5,7 @@
 -----
 > نام و آدرس پست الکترونیکی اعضای گروه را در این قسمت بنویسید.
 
-نام و نام خانوادگی <example@example.com>
+آرمان بابایی <292arma@gmail.com>
 
 نام و نام خانوادگی <example@example.com> 
 
@@ -28,13 +28,34 @@
 ## یافتن دستور معیوب
 
 ۱.
+0xc0000008
 
 ۲.
+eip=0x8048757
 
 ۳.
+تابع `_start`
+```
+08048754 <_start>:
+   8048754:       83 ec 1c                sub    $0x1c,%esp
+-> 8048757:       8b 44 24 24             mov    0x24(%esp),%eax
+   804875b:       89 44 24 04             mov    %eax,0x4(%esp)
+   804875f:       8b 44 24 20             mov    0x20(%esp),%eax
+   8048763:       89 04 24                mov    %eax,(%esp)
+   8048766:       e8 35 f9 ff ff          call   80480a0 <main>
+   804876b:       89 04 24                mov    %eax,(%esp)
+   804876e:       e8 49 1b 00 00          call   804a2bc <exit>
+
+```
 
 ۴.
-
+```
+void
+_start (int argc, char *argv[])
+{
+exit (main (argc, argv));
+}
+```
 ۵.
 
 ## به سوی crash
