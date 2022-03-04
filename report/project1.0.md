@@ -9,7 +9,7 @@
 
 مهدی سلمانی صالح آبادی <m10.salmani@gmail.com> 
 
-نام و نام خانوادگی <example@example.com> 
+پارسا حسینی <sp.hoseiny@gmail.com> 
 
 نام و نام خانوادگی <example@example.com> 
 
