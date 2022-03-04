@@ -101,9 +101,27 @@ pintos-debug: dumplist #2: 0xc010a000 {tid = 3, status = THREAD_RUNNING, name = 
 c0035920 <ready_list>, next = 0xc0035928 <ready_list+8>}, pagedir = 0x0, magic = 3446325067}
 ```
 ۹.
+با قرار دادن breakpoint روی thread_create متوجه می‌شویم تابعی که این ریسه را ایجاد کرده است، process_execute در process.c است.
+
+```
+ 44|   /* Create a new thread to execute FILE_NAME. */
+ 45+>  tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
+ 46|   if (tid == TID_ERROR)     y);
+ 48|   return tid;ee_page (fn_cop
+ 49| }
+```
 
 ۱۰.
-
+قبل از اجرای تابع load
+```
+{edi = 0x0, esi = 0x0, ebp = 0x0, esp_dummy = 0x0, ebx = 0x0, edx = 0x0, ecx = 0x0, eax = 0x0, gs = 0x23, fs = 0x23, es = 0x23, ds = 0x23, vec_no = 0x0, error_code = 0x0, frame_pointer = 0x0, eip = 0x0, cs = 0x1b, eflags = 0x20
+2, esp = 0x0, ss = 0x23}
+```
+پس از اجرای تابع load
+```
+{edi = 0x0, esi = 0x0, ebp = 0x0, esp_dummy = 0x0, ebx = 0x0, edx = 0x0, ecx = 0x0, eax = 0x0, gs = 0x23, fs = 0x23, es = 0x23, ds = 0x23, vec_no = 0x0, error_code = 0x0, frame_pointer = 0x0, eip = 0x8048754, cs = 0x1b, eflags
+= 0x202, esp = 0xc0000000, ss = 0x23}
+```
 ۱۱.
 
 ۱۲.
