@@ -78,7 +78,18 @@ pintos-debug: dumplist #1: 0xc0104000 {tid = 2, status = THREAD_BLOCKED, name = 
 c0035920 <ready_list>, next = 0xc0035928 <ready_list+8>}, pagedir = 0x0, magic = 3446325067}
 ```
 ۷.
+```
+#0  process_execute (file_name=file_name@entry=0xc0007d50 "do-nothing") at ../../userprog/process.c:32
+#1  0xc0020268 in run_task (argv=0xc00357cc <argv+12>) at ../../threads/init.c:288
+#2  0xc0020921 in run_actions (argv=0xc00357cc <argv+12>) at ../../threads/init.c:340
+#3  main () at ../../threads/init.c:133p
+```
 
+```
+#1 : 288+>  process_wait (process_execute (task));
+#2 : 340+>      a->function (argv);
+#3 : 133+>  run_actions (argv);
+```
 ۸.
 
 ۹.
