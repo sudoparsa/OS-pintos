@@ -1,5 +1,6 @@
 <div style="text-align: right">
 تمرین گروهی ۱/۰ - آشنایی با pintos
+</div>
 ======================
 
 شماره گروه: ۶
@@ -174,5 +175,3 @@ c0035920 <ready_list>, next = 0xc0035928 <ready_list+8>}, pagedir = 0x0, magic =
 ۱۸.
 
 ۱۹.
-
-</div>
