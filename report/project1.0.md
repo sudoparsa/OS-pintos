@@ -11,7 +11,7 @@
 
 پارسا حسینی <sp.hoseiny@gmail.com> 
 
-علیرضا ددهقانپور <alirezafarashah@gmail.com> 
+علیرضا دهقانپور <alirezafarashah@gmail.com>  
 
 مقدمات
 ----------
@@ -208,9 +208,21 @@ dummy return address -> PHYS_BASE - 36
 
 ۱۶.
 
+```
+0xbfffff98:     0x00000001      0x000000a2
+```
+
+
 ۱۷.
+```
+args[0] = 0x00000001 = 1
+args[1] = 0x000000a2 = 162
+```
+
 
 ۱۸.
+در ابتدا دقت کنید که sema_down  در `process_wait` قرار دارد و  sema_up  در `process_exit` قرار دارد. دلیل این کار نیز این است که در یک ریسه در process wait سعی می‌شود temporary کم شود ولی مادامی که صفر است این اتفاق نمی‌افتد. (دقت کنید در ابتدا temporary صفر است.) و در ریسه دیگر با اجرای process_exit  این temp  برابر با یک می‌شود و process wait بالاخره اجرا می‌شود. (می‌تواند temp را کم کند.) دقت کنید این طراحی فقط برای یک پراسس به صورت همزمان است.
+
 
 ۱۹.
 
