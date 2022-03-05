@@ -11,7 +11,7 @@
 
 پارسا حسینی <sp.hoseiny@gmail.com> 
 
-نام و نام خانوادگی <example@example.com> 
+علیرضا ددهقانپور <alirezafarashah@gmail.com> 
 
 مقدمات
 ----------
