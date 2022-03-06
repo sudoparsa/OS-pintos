@@ -1,3 +1,4 @@
+<div dir="rtl">
 تمرین گروهی ۱/۰ - آشنایی با pintos
 ======================
 
@@ -35,6 +36,9 @@ eip=0x8048757
 
 ۳.
 تابع `_start`
+
+<div dir="auto">
+
 ```
 08048754 <_start>:
    8048754:       83 ec 1c                sub    $0x1c,%esp
@@ -48,10 +52,12 @@ eip=0x8048757
 
 ```
 
-
-
+</div>
 
 ۴.
+
+<div dir="auto">
+
 ```
 void
 _start (int argc, char *argv[])
@@ -59,11 +65,12 @@ _start (int argc, char *argv[])
 exit (main (argc, argv));
 }
 ```
+</div>
 
+-در ابتدا با کم کردن esp به اندازه‌ی 0x1c فضای کافی برای قرار گرفتن ورودی‌ها (8 بایت برای قرارگیری هریک از argv و argc در یک رجیستر extended) و همچنین فضای خالی برای انطباق با ABI قرار داده می‌شود. (با اضافه شدن چهار بابت آدرس برگشت، مقدار کم شدن برابر 0x20 می‌شود.)
 
+-در ادامه با توجه به این که انتقال از حافظه به حافظه ممکن نیست، به کمک واسطه‌ی eax مقدار داخل 0x8 نسبت به esp در ابتدای صدازدن تابع یعنی همان argv به موقعیت 0x4 کنونی یعنی محل قرار دادن این آرگومان برای صدا زدن تابع main قرار می‌گیرد.
 
-در ابتدا با کم کردن esp به اندازه‌ی 0x1c فضای کافی برای قرار گرفتن ورودی‌ها و آدرس برگشت و همچنین فضای خالی برای انطباق با cache قرار داده می‌شود. (با اضافه شدن چهار بابت آدرس برگشت، مقدار کم شدن برابر 0x20 می‌شود.)
-در ادامه با توجه به این که انتقال از حافظه به حافظه ممکن نیست، به کمک واسطه‌ی eax مقدار 0x8 در ابتدای صدازدن تابع یعنی همان argv به 0x4 کنونی یعنی محل قرار دادن این آرگومان برای صدا زدن تابع main قرار می‌گیرد.
 در ادامه همین کار برای 0x4 قبلی که همان argc است انجام می‌شود و در محل esp قرار می‌گیرد.
 سپس به کمک دستور call تابع main صدا زده می‌شود و خروجی در eax قرار می‌گیرد.
 در نهایت خروجی main در esp به عنوان آرگومان تابع exit قرار می‌گیرد و این تابع با دستور call صدا زده می‌شود.
@@ -77,16 +84,22 @@ exit (main (argc, argv));
 
 ۶.
 ریسه‌ی main با آدرس0xc000e000 این دستور را اجرا می‌کند. ریسه‌ی دیگری که در وجود دارد idle است که اطلاعات هردوی آن‌ها در زیر آمده است.
+
+<div dir="auto">
+
 ```
 pintos-debug: dumplist #0: 0xc000e000 {tid = 1, status = THREAD_RUNNING, name = "main", '\000' <repeats 11 times>, stack = 0xc000edec <incomplete sequence \357>, priority = 31, allelem = {prev = 0xc0035910 <all_list>, next = 0xc0104
 020}, elem = {prev = 0xc0035920 <ready_list>, next = 0xc0035928 <ready_list+8>}, pagedir = 0x0, magic = 3446325067}
 pintos-debug: dumplist #1: 0xc0104000 {tid = 2, status = THREAD_BLOCKED, name = "idle", '\000' <repeats 11 times>, stack = 0xc0104f34 "", priority = 0, allelem = {prev = 0xc000e020, next = 0xc0035918 <all_list+8>}, elem = {prev = 0x
 c0035920 <ready_list>, next = 0xc0035928 <ready_list+8>}, pagedir = 0x0, magic = 3446325067}
 ```
-
+</div>
 
 
 ۷.
+
+<div dir="auto">
+
 ```
 #0  process_execute (file_name=file_name@entry=0xc0007d50 "do-nothing") at ../../userprog/process.c:32
 #1  0xc0020268 in run_task (argv=0xc00357cc <argv+12>) at ../../threads/init.c:288
@@ -94,19 +107,19 @@ c0035920 <ready_list>, next = 0xc0035928 <ready_list+8>}, pagedir = 0x0, magic =
 #3  main () at ../../threads/init.c:133p
 ```
 
-
-
-
 ```
 #1 : 288+>  process_wait (process_execute (task));
 #2 : 340+>      a->function (argv);
 #3 : 133+>  run_actions (argv);
 ```
 
-
+</div>
 
 ۸.
 به ریسه‌های پیشین، ریسه‌ی do-nothing اضافه شده است.
+
+<div dir="auto">
+
 ```
 pintos-debug: dumplist #0: 0xc000e000 {tid = 1, status = THREAD_BLOCKED, name = "main", '\000' <repeats 11 times>, stack = 0xc000eeac "\001", priority = 31, allelem = {prev = 0xc0035910 <all_list>, next = 0xc0104020}, elem = {prev =
  0xc0037314 <temporary+4>, next = 0xc003731c <temporary+12>}, pagedir = 0x0, magic = 3446325067}
@@ -116,10 +129,13 @@ pintos-debug: dumplist #2: 0xc010a000 {tid = 3, status = THREAD_RUNNING, name = 
 c0035920 <ready_list>, next = 0xc0035928 <ready_list+8>}, pagedir = 0x0, magic = 3446325067}
 ```
 
+</div>
 
 
 ۹.
 با قرار دادن breakpoint روی thread_create متوجه می‌شویم تابعی که این ریسه را ایجاد کرده است، process_execute در process.c است.
+
+<div dir="auto">
 
 ```
  44|   /* Create a new thread to execute FILE_NAME. */
@@ -129,24 +145,28 @@ c0035920 <ready_list>, next = 0xc0035928 <ready_list+8>}, pagedir = 0x0, magic =
  49| }
 ```
 
-
-
+</div>
 
 ۱۰.
 قبل از اجرای تابع load
+
+<div dir="auto">
+
 ```
 {edi = 0x0, esi = 0x0, ebp = 0x0, esp_dummy = 0x0, ebx = 0x0, edx = 0x0, ecx = 0x0, eax = 0x0, gs = 0x23, fs = 0x23, es = 0x23, ds = 0x23, vec_no = 0x0, error_code = 0x0, frame_pointer = 0x0, eip = 0x0, cs = 0x1b, eflags = 0x20
 2, esp = 0x0, ss = 0x23}
 ```
-
-
+</div>
 
 پس از اجرای تابع load
+<div dir="auto">
+
 ```
 {edi = 0x0, esi = 0x0, ebp = 0x0, esp_dummy = 0x0, ebx = 0x0, edx = 0x0, ecx = 0x0, eax = 0x0, gs = 0x23, fs = 0x23, es = 0x23, ds = 0x23, vec_no = 0x0, error_code = 0x0, frame_pointer = 0x0, eip = 0x8048754, cs = 0x1b, eflags
 = 0x202, esp = 0xc0000000, ss = 0x23}
 ```
 
+</div>
 
 
 ۱۱. 
@@ -157,6 +177,9 @@ c0035920 <ready_list>, next = 0xc0035928 <ready_list+8>}, pagedir = 0x0, magic =
 ۱۲. 
 
 در زیر خروجی دستور `info register` را مشاهده می‌کنید. همانطور که در زیر می‌بینید با `_if` تفاوتی ندارند.
+
+<div dir="auto">
+
 ```
 eax            0x0      0
 ecx            0x0      0
@@ -175,22 +198,25 @@ es             0x23     35
 fs             0x23     35
 gs             0x23     35
 ```
-
+</div>
 
 
 ۱۳.
+<div dir="auto">
 
 ```
 #0  _start (argc=<unavailable>, argv=<unavailable>) at ../../lib/user/entry.c:9
 ```
 
-
-
+</div>
 
 ## دیباگ
 
 ۱۴.
 برای پاس کردن تست مذکور دستور `if_.esp -= 36` را در تابع  `start_process` پس از دستور `load` که در آن مقدار esp تعیین می‌شود قرار می‌دهیم. چرا؟ در بخش استک مربوط به userspace مطابق صفحه 19 مرجع داده شده برابر خواهد بود با:
+
+<div dir="auto">
+
 ```
 argv[0][...]
 stack-align -> PHYS_BASE - 20
@@ -199,7 +225,7 @@ argv -> PHYS_BASE - 28
 argc -> PHYS_BASE - 32
 dummy return address -> PHYS_BASE - 36
 ```  
-
+</div>
 در واقع مطابق با مرجع باید استک به صورت 16 بایتی align باشد. (پایان آدرس هر بلاک باید با c تمام شود.)
 
 ۱۵.
@@ -207,18 +233,21 @@ dummy return address -> PHYS_BASE - 36
 همانطور که در قسمت قبل گفتیم باید esp به صورت 16 بایتی align باشد. و باید پایان هر آدرس esp به c ختم می‌شود. پس باقی‌مانده esp به 16 همواره باید 12 باشد.
 
 ۱۶.
+<div dir="auto">
 
 ```
 0xbfffff98:     0x00000001      0x000000a2
 ```
-
+</div>
 
 ۱۷.
+<div dir="auto">
+
 ```
 args[0] = 0x00000001 = 1
 args[1] = 0x000000a2 = 162
 ```
-
+</div>
 
 ۱۸.
 در ابتدا دقت کنید که sema_down  در `process_wait` قرار دارد و  sema_up  در `process_exit` قرار دارد. دلیل این کار نیز این است که در یک ریسه در process wait سعی می‌شود temporary کم شود ولی مادامی که صفر است این اتفاق نمی‌افتد. (دقت کنید در ابتدا temporary صفر است.) و در ریسه دیگر با اجرای process_exit  این temp  برابر با یک می‌شود و process wait بالاخره اجرا می‌شود. (می‌تواند temp را کم کند.) دقت کنید این طراحی فقط برای یک پراسس به صورت همزمان است.
@@ -229,7 +258,12 @@ args[1] = 0x000000a2 = 162
 با استفاده از از دستور `info thread` به این نتیجه می‌رسیم که ریسه `main` با آدرس `0xc000e000` این تابع را اجرا کرده است.
 
 در زیر با دستور `dumplist &all_list thread allelem`  تمام ریسه‌ها (استراکتشان) چاپ شده است.
+
+<div dir="auto">
+
 ```
 pintos-debug: dumplist #0: 0xc000e000 {tid = 1, status = THREAD_RUNNING, name = "main", '\000' <repeats 11 times>, stack = 0xc000eeac "\001", priority = 31, allelem = {prev = 0xc0035910 <all_list>, next = 0xc0104020}, elem = {prev = 0xc0035920 <ready_list>, next = 0xc0035928 <ready_list+8>}, pagedir = 0x0, magic = 3446325067}
 pintos-debug: dumplist #1: 0xc0104000 {tid = 2, status = THREAD_BLOCKED, name = "idle", '\000' <repeats 11 times>, stack = 0xc0104f34 "", priority = 0, allelem = {prev = 0xc000e020, next = 0xc0035918 <all_list+8>}, elem = {prev = 0xc0035920 <ready_list>, next = 0xc0035928 <ready_list+8>}, pagedir = 0x0, magic = 3446325067}
 ```
+</div>
+</div>
