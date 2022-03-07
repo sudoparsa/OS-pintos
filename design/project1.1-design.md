@@ -35,6 +35,8 @@
 
 در این قسمت نیازی به داده ساختار خاصی نیست. یک تابع tokenize پیاده می‌کنیم که file_name را ورودی گرفته و متغیرهای استاتیک argc (تعداد آرگومان‌های ورودی) و argv (لیست آرگومان‌ها) را ست کند. برای تعریف این متغیرها در ابتدای کد process.c به شکل زیر عمل می‌کنیم:
 
+<div dir="auto">
+
 ```C
 
 #define MAX_ARGUMENTS 32;
@@ -46,7 +48,7 @@ int argc;
 bool tokenize(char* file_name);
 
 ```
-
+</div>
 
 دقت کنید خروجی تابع tokenize اگر محدودیت‌ها رعایت شده باشد، True خواهد بود و در غیر این صورت False.
 
@@ -60,21 +62,24 @@ bool tokenize(char* file_name);
 
 برای این قسمت تنها باید دو تابع در فایل process.c عوض شود. در ادامه این دو تابع و تغییراتشان را توضیح داده‌ایم.
 
+<div dir="auto">
+
 ```C
 
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 
 ```
-
+</div>
 
 در این تابع قبل از اینکه filesys_open صدا زده شود، باید تابع tokenize که زدیم صدا زده شده و argc و argv ست شوند. بعد باید به آن argv[0] پاس داده شود. (اسم فایل اجرایی) همچنین باید `setup_stack` هم در این تابع عوض شود که esp و argc و argv را به عنوان ورودی بگیرد.
+<div dir="auto">
 
 ```C
 
 static bool setup_stack (void **esp, int argc, char* argv);
 
 ```
-
+</div>
 
 این تابعی است که تغییرات اصلی در آن صورت می‌گیرد. بعد از install_page در داخل if، باید آرگومان‌ها را به ترتیب درست در پشته قرار دهیم. برای اینکار ابتدا رشته tokenize شده دستور را در پشته قرار داده، و هر بار esp را کم می‌کنیم. سپس باید alignment را چک کرد و جای خالی در صورت لزوم قرار داد. (این فضای خالی به خاطر معماری x86 است که در داک انگلیسی پروژه در صفحه شماره 19 توضیح داده شده) حالا باید argv را قرار دهیم، برای این اول یک NULL قرار می‌دهیم. (منظور همان `argv[argc]` است) بعد به ترتیب از `argv[argc-1]` شروع کرده و آدرس کلمه متناظر آن که قبلا پوش کردیم را قرار داده و esp را کم می‌کنیم تا به `argv[0]` برسیم. و بعد هم خود آدرس argv را قرار می‌دهیم. argc بعد از آن قرار گرفته و در انتها return address (به صورت fake) را می‌گذاریم. در انتها مقدار esp به خانه return address اشاره خواهد کرد.
 
@@ -127,6 +132,8 @@ struct child_parent_status {
 
 };
 
+
+// An struct for keeping track of open files.
 struct fd {
 
   int fd;
@@ -142,7 +149,7 @@ struct thread {
   struct list children;
 
   struct child_parent_status cps;
-
+  // This keeps track of what file descriptors thread has.
   struct fd* descriptors[MAX_FILE_DESCRIPTORS];
 
 };
@@ -154,7 +161,7 @@ struct thread {
 
 // pintos/src/userprog/syscall.c
 
-struct lock file_lock;
+struct lock file_lock; // The global lock for synchronization of all file operations.
 
 ```
 
