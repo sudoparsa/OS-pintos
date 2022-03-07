@@ -14,7 +14,7 @@
 
 آرمان بابایی <292arma@gmail.com> 
 
-نام و نام خانوادگی <example@example.com> 
+مهدی سلمانی صالح‌آبادی <m10.salmani@gmail.com> 
 
 مقدمات
 
