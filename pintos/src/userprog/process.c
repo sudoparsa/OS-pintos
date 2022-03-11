@@ -275,6 +275,9 @@ load (char *file_name, void (**eip) (void), void **esp)
       goto done;
     }
 
+  memcpy(thread_current()->name, argv[0], 15);
+  thread_current()->name[15] = '\0';
+
   /* Open executable file. */
   file = filesys_open (argv[0]);
   if (file == NULL)
