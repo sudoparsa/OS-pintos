@@ -19,9 +19,46 @@
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 
+#define MAX_ARGUMENTS        32
+#define MAX_ARGUMENT_LENGTH  1024
+#define ARGUMENT_DELIMITER   " "
+
+static char* argv[MAX_ARGUMENTS];
+static int argc;
+static bool tokenize(char* cmd_line);
+
 static struct semaphore temporary;
 static thread_func start_process NO_RETURN;
-static bool load (const char *cmdline, void (**eip) (void), void **esp);
+static bool load (char *cmdline, void (**eip) (void), void **esp);
+
+/* Tokenizes the cmd_line provided as the input, and sets argc and
+ * argv variables accordingly, returns true on sucess, and false
+ * otherwise. */
+bool
+tokenize(char* cmd_line)
+{
+  int i;
+  char *c;
+
+  for (i = 0; i < MAX_ARGUMENTS; ++ i)
+    argv[i] = NULL;  /* empty argv */
+
+  argc = 0;
+  char* strtok_saveptr;
+  c = strtok_r(cmd_line, ARGUMENT_DELIMITER, &strtok_saveptr);  /* Start tokenizer on the input */
+  for (i = 0; c && (i < MAX_ARGUMENTS); ++ i)
+    {
+      argv[i] = c;
+      argc ++;
+      c = strtok_r(NULL, ARGUMENT_DELIMITER, &strtok_saveptr);  /* scan for next token */
+    }
+
+  /* Return false if we ran out of space on argv. */
+  if (strtok_r(NULL, ARGUMENT_DELIMITER, &strtok_saveptr) != NULL)
+    return false;
+
+  return true;
+}
 
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
@@ -63,7 +100,6 @@ start_process (void *file_name_)
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (file_name, &if_.eip, &if_.esp);
-  if_.esp -= 36;
 
   /* If load failed, quit. */
   palloc_free_page (file_name);
@@ -212,7 +248,7 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
    and its initial stack pointer into *ESP.
    Returns true if successful, false otherwise. */
 bool
-load (const char *file_name, void (**eip) (void), void **esp)
+load (char *file_name, void (**eip) (void), void **esp)
 {
   struct thread *t = thread_current ();
   struct Elf32_Ehdr ehdr;
@@ -227,8 +263,20 @@ load (const char *file_name, void (**eip) (void), void **esp)
     goto done;
   process_activate ();
 
+  /* Fill argc and argv. */
+  if (!tokenize(file_name))
+    {
+      printf ("load: %s: cannot tokenize\n", file_name);
+      goto done;
+    }
+  if (argc < 1)
+    {
+      printf("load: cannot run program with no args.\n");
+      goto done;
+    }
+
   /* Open executable file. */
-  file = filesys_open (file_name);
+  file = filesys_open (argv[0]);
   if (file == NULL)
     {
       printf ("load: %s: open failed\n", file_name);
@@ -430,6 +478,51 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
   return true;
 }
 
+/* Adds arguments and corresponding argc and argv to stack and
+ * decreases esp. */
+static bool
+fill_args_in_stack (void **esp)
+{
+  /* Put arguments on stack and update argv accordingly. */
+//  printf("###############  filling in...  ###############\n");
+//  printf("argc: %d\n", argc);
+  for (int i = 0; i < argc; i ++)
+    {
+//      printf("argv[%d]: %s\n", i, argv[i]);
+      const size_t len = strnlen(argv[i], MAX_ARGUMENT_LENGTH) + 1;
+      *esp -= len;
+      if (len > MAX_ARGUMENT_LENGTH)
+        return false;
+
+      memcpy (*esp, argv[i], len);
+      argv[i] = *esp;
+    }
+
+  /* Align stack. */
+  const int align_size = ((size_t) *esp) % 4 + ((argc + 3) % 4) * 4;
+  *esp -= align_size;
+  memset (*esp, 0, align_size);
+
+  /* Put argv[argc]. */
+  *esp -= 4;
+  memset(*esp, 0, 4);
+
+  /* Put argv. */
+  *esp -= argc * 4;
+  memcpy(*esp, argv, argc * 4);
+  *esp -= 4;
+  *((size_t*)*esp) = (size_t)(*esp + 4);
+
+  /* Put argc. */
+  *esp -= 4;
+  *((size_t*)*esp) = argc;
+
+  /* Put return address. */
+  *esp -= 4;
+//  hex_dump(*esp, *esp, (void*)0xc0000000 - *esp, true);
+  return true;
+}
+
 /* Create a minimal stack by mapping a zeroed page at the top of
    user virtual memory. */
 static bool
@@ -443,7 +536,10 @@ setup_stack (void **esp)
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
       if (success)
-        *esp = PHYS_BASE;
+        {
+          *esp = PHYS_BASE;
+          success &= fill_args_in_stack(esp);
+        }
       else
         palloc_free_page (kpage);
     }
