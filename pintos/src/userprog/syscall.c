@@ -8,6 +8,19 @@
 #include "filesys/file.h"
 #include "filesys/filesys.h"
 
+#define MAX_SYSCALL_ARGUMENTS     10
+
+
+#define CHECK_ARGS(args, count, is_address...) \
+if (!check_arguments(args, count, is_address)) EXIT_WITH_ERROR
+
+#define EXIT_WITH_ERROR \
+{ \
+  printf ("%s: exit(%d)\n", &thread_current ()->name, -1); \
+  thread_exit (); \
+  return; \
+}
+
 static void syscall_handler (struct intr_frame *);
 
 void
@@ -16,25 +29,54 @@ syscall_init (void)
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
-static bool is_user_mapped_memory(const void *address)
+static bool
+is_user_mapped_memory(const void *address)
 {
   if (is_user_vaddr(address))
     return (pagedir_get_page(thread_current ()->pagedir, address) != NULL);
-  return 0;
+  return false;
+}
+
+/* Checks if arguments for a system call are valid. It
+ * first checks that ARRAY has ARG_COUNT members in user memory
+ * (it doesn't check for only stack) and then for every argument,
+ * it checks that if it's an address, it is in user space.
+ *
+ * The function call check_arguments(arr, 3, true, false, true)
+ * checks for a system call which has 3 arguments which first and
+ * last one of them is an address.
+ */
+static bool
+check_arguments(uint32_t* array, uint32_t arg_count, bool is_address, ... /* address argument
+ * indices */)
+{
+  if (arg_count > MAX_SYSCALL_ARGUMENTS)
+    return false;
+
+  if (!is_user_mapped_memory(array) || !is_user_mapped_memory((void *)(array + arg_count + 1) - 1))
+    return false;
+
+  if (is_address && !is_user_mapped_memory(array[1]))
+    return false;
+
+  va_list args;
+  va_start(args, arg_count);
+  for (size_t i = 2; i <= arg_count; i ++) {
+    if (va_arg(args, bool) && !is_user_mapped_memory(array[i]))
+      return false;
+  }
+  va_end(args);
+
+  return true;
 }
 
 static void
 syscall_handler (struct intr_frame *f)
 {
-  uint32_t* args = ((uint32_t*) f->esp);
-  const int max_args = (uint32_t*) PHYS_BASE - args;
+  if (!is_kernel_vaddr(f) || !is_kernel_vaddr((void *)(f + 1) - 1))
+    EXIT_WITH_ERROR;
 
-  if (max_args < 1)
-    {
-      f->eax = -1;
-      thread_exit ();
-      return;
-    }
+  uint32_t* args = ((uint32_t*) f->esp);
 
   /*
    * The following print statement, if uncommented, will print out the syscall
@@ -43,11 +85,14 @@ syscall_handler (struct intr_frame *f)
    * include it in your final submission.
    */
 
-   /*printf("System call number: %d\n", args[0]);*/
+  /*printf("System call number: %d\n", args[0]);*/
+
+  CHECK_ARGS(args, 0, false);
 
   switch (args[0])
     {
     case SYS_EXIT:                   //  Terminate this process.
+      CHECK_ARGS(args, 1, false);
       f->eax = args[1];
       printf ("%s: exit(%d)\n", &thread_current ()->name, args[1]);
       thread_exit ();
@@ -70,6 +115,7 @@ syscall_handler (struct intr_frame *f)
     case SYS_TELL:                   //  Report current position in a file. 
     case SYS_CLOSE:                  //  Close a file. 
     case SYS_PRACTICE:               //  Returns arg incremented by 1
+      check_arguments(args, 1, false);
       f->eax = args[1] + 1;
       break;
     default:
