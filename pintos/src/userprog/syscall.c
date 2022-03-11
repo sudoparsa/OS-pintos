@@ -70,6 +70,8 @@ syscall_handler (struct intr_frame *f)
     case SYS_TELL:                   //  Report current position in a file. 
     case SYS_CLOSE:                  //  Close a file. 
     case SYS_PRACTICE:               //  Returns arg incremented by 1
+      f->eax = args[1] + 1;
+      break;
     default:
       break;
     }
