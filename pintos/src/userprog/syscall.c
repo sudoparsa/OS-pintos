@@ -27,6 +27,7 @@ static void syscall_handler (struct intr_frame *);
 
 static void write_syscall (struct intr_frame *, uint32_t*, struct thread*);
 static void read_syscall (struct intr_frame *, uint32_t*, struct thread*);
+static void filesize_syscall (struct intr_frame *, uint32_t*, struct thread*);
 
 
 void
@@ -144,6 +145,8 @@ syscall_handler (struct intr_frame *f)
         break;
       }
     case SYS_FILESIZE:               //  Obtain a file's size. 
+      filesize_syscall (f, args, trd);
+      break;
     case SYS_READ:                   //  Read from a file.
       read_syscall (f, args, trd);
       break;
@@ -234,4 +237,19 @@ write_syscall (struct intr_frame *f, uint32_t* args, struct thread* trd)
       EXIT_WITH_ERROR;
 
   f->eax = file_write (trd->file_descriptors[fd], buffer, length);
+}
+
+static void 
+filesize_syscall (struct intr_frame *f, uint32_t* args, struct thread* trd)
+{
+  CHECK_ARGS(args, 1, false);
+
+  int fd = (int) args[1];
+
+  /* Fail when writing a wrong fd or standard input or standard output */
+  if (!check_fd(trd, fd) || fd == 0 || fd == 1)
+      EXIT_WITH_ERROR;
+
+  f->eax = file_length (trd->file_descriptors[fd]);
+
 }
