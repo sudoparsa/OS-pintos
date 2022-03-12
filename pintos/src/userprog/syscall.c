@@ -28,6 +28,10 @@ static void syscall_handler (struct intr_frame *);
 static void write_syscall (struct intr_frame *, uint32_t*, struct thread*);
 static void read_syscall (struct intr_frame *, uint32_t*, struct thread*);
 static void filesize_syscall (struct intr_frame *, uint32_t*, struct thread*);
+static void seek_syscall (struct intr_frame *, uint32_t*, struct thread*);
+static void tell_syscall (struct intr_frame *, uint32_t*, struct thread*);
+
+
 
 
 void
@@ -153,8 +157,11 @@ syscall_handler (struct intr_frame *f)
     case SYS_WRITE:                  //  Write to a file.
       write_syscall (f, args, trd);
       break;
-    case SYS_SEEK:                   //  Change position in a file. 
+    case SYS_SEEK:                   //  Change position in a file.
+      seek_syscall (f, args, trd);
+      break; 
     case SYS_TELL:                   //  Report current position in a file.
+      tell_syscall (f, args, trd);
       break;
     case SYS_CLOSE:                  //  Close a file.
       {
@@ -246,10 +253,39 @@ filesize_syscall (struct intr_frame *f, uint32_t* args, struct thread* trd)
 
   int fd = (int) args[1];
 
-  /* Fail when writing a wrong fd or standard input or standard output */
+  /* Fail when want size of a wrong fd or standard input or standard output */
   if (!check_fd(trd, fd) || fd == 0 || fd == 1)
       EXIT_WITH_ERROR;
 
   f->eax = file_length (trd->file_descriptors[fd]);
+}
 
+static void 
+tell_syscall (struct intr_frame *f, uint32_t* args, struct thread* trd)
+{
+  CHECK_ARGS(args, 1, false);
+
+  int fd = args[1];
+
+  /* Fail when tell of a wrong fd or standard input or standard output */
+  if (!check_fd(trd, fd) || fd == 0 || fd == 1)
+      EXIT_WITH_ERROR;
+  
+  f->eax = file_tell (trd->file_descriptors[fd]);
+}
+
+static void 
+seek_syscall (struct intr_frame *f, uint32_t* args, struct thread* trd)
+{
+  CHECK_ARGS(args, 2, false, false);
+
+  int fd = args[1];
+  int position = args[2];
+
+  /* Fail when seek of a wrong fd or standard input or standard output */
+  if (!check_fd(trd, fd) || fd == 0 || fd == 1)
+      EXIT_WITH_ERROR;
+  
+  file_seek (trd->file_descriptors[fd], position);
+  f->eax = 0;
 }
