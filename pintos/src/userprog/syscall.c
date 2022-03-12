@@ -23,6 +23,8 @@ if (!check_arguments((args), (count), __VA_ARGS__)) EXIT_WITH_ERROR
 
 static void syscall_handler (struct intr_frame *);
 
+static void write_syscall (struct intr_frame *, uint32_t*);
+
 void
 syscall_init (void)
 {
@@ -141,7 +143,7 @@ syscall_handler (struct intr_frame *f)
     case SYS_READ:                   //  Read from a file.
       break;
     case SYS_WRITE:                  //  Write to a file.
-      printf((const char *) args[2]);
+      write_syscall (f, args);
       break;
     case SYS_SEEK:                   //  Change position in a file. 
     case SYS_TELL:                   //  Report current position in a file.
@@ -163,4 +165,29 @@ syscall_handler (struct intr_frame *f)
     default:
       break;
     }
+}
+
+static void 
+write_syscall (struct intr_frame *f, uint32_t* args)
+{
+  CHECK_ARGS (args, 3, false, true, false);
+
+  struct thread * trd = thread_current ();
+
+  int fd = (int) args[1];
+  char *buffer = (char *) args[2];
+  int length = (int) args[3];
+
+  if (args[1] == 1 || args[1] == 2)
+    {
+      putbuf (buffer, length);
+      f->eax = length;
+      return;
+    }
+
+  /* Fail when writing a wrong fd or standard input */
+  if (!check_fd(trd, args[1]) || !args[1])
+      EXIT_WITH_ERROR;
+
+  f->eax = file_write (trd->file_descriptors[fd], buffer, length);
 }
