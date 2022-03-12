@@ -463,6 +463,7 @@ init_thread (struct thread *t, const char *name, int priority)
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
   t->magic = THREAD_MAGIC;
+  /* t->file_descriptors is assumed to remain 0. */
 
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);
@@ -578,6 +579,23 @@ allocate_tid (void)
 
   return tid;
 }
+
+/* Searches for a free file descriptor in `struct thread`
+   and returns its index in the thread array, and -1 if
+   T has no free file descriptor. */
+int
+thread_get_free_file_descriptor(struct thread * t)
+{
+  /* Descriptors 0, 1, (and I reserved it for execution
+     text file probably) 2 are reserved. */
+  for (int i = 3; i < MAX_FILE_DESCRIPTORS; i ++)
+    {
+      if (t->file_descriptors[i] == NULL)
+        return i;
+    }
+  return -1;
+}
+
 
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */

@@ -16,7 +16,7 @@ if (!check_arguments((args), (count), __VA_ARGS__)) EXIT_WITH_ERROR
 
 #define EXIT_WITH_ERROR \
 { \
-  printf ("%s: exit(%d)\n", &thread_current ()->name, -1); \
+  printf ("%s: exit(%d)\n", thread_current ()->name, -1); \
   thread_exit (); \
   return; \
 }
@@ -70,6 +70,20 @@ check_arguments(uint32_t* array, uint32_t arg_count, uint32_t is_address, ...)
   return true;
 }
 
+/* Checks if file descriptor FD is a valid, non-NULL
+   descriptor in thread T. */
+static bool
+check_fd(struct thread *t, int fd)
+{
+  if (fd > MAX_FILE_DESCRIPTORS || fd < 0)
+    return false;
+
+  if (t->file_descriptors[fd] == NULL)
+    return false;
+
+  return true;
+}
+
 static void
 syscall_handler (struct intr_frame *f)
 {
@@ -88,13 +102,14 @@ syscall_handler (struct intr_frame *f)
   /*printf("System call number: %d\n", args[0]);*/
 
   CHECK_ARGS(args, 0, false);
+  struct thread * trd = thread_current ();
 
   switch (args[0])
     {
     case SYS_EXIT:                   //  Terminate this process.
       CHECK_ARGS(args, 1, false);
       f->eax = args[1];
-      printf ("%s: exit(%d)\n", &thread_current ()->name, args[1]);
+      printf ("%s: exit(%d)\n", trd->name, args[1]);
       thread_exit ();
       break;
     case SYS_HALT:                   //  Halt the operating system.
@@ -102,20 +117,45 @@ syscall_handler (struct intr_frame *f)
     case SYS_WAIT:                   //  Wait for a child process to die.
       break;
     case SYS_CREATE:                 //  Create a file.
-      CHECK_ARGS(args, 2, true, false);
-      f->eax = filesys_create((const char *) args[1], args[2]);
+      CHECK_ARGS (args, 2, true, false);
+      f->eax = filesys_create ((const char *) args[1], args[2]);
       break;
     case SYS_REMOVE:                 //  Delete a file.
-    case SYS_OPEN:                   //  Open a file. 
+      CHECK_ARGS (args, 1, true);
+      f->eax = filesys_remove ((const char *) args[1]);
+      break;
+    case SYS_OPEN:                   //  Open a file.
+      {
+        CHECK_ARGS (args, 1, true);
+        int fd = thread_get_free_file_descriptor (trd);
+        f->eax = fd;
+        if (fd > 0)
+          {
+            trd->file_descriptors[fd] = filesys_open ((const char *) args[1]);
+            if (trd->file_descriptors[fd] == NULL)
+              f->eax = -1;
+          }
+        break;
+      }
     case SYS_FILESIZE:               //  Obtain a file's size. 
     case SYS_READ:                   //  Read from a file.
       break;
     case SYS_WRITE:                  //  Write to a file.
-      printf(args[2]);
+      printf((const char *) args[2]);
       break;
     case SYS_SEEK:                   //  Change position in a file. 
-    case SYS_TELL:                   //  Report current position in a file. 
-    case SYS_CLOSE:                  //  Close a file. 
+    case SYS_TELL:                   //  Report current position in a file.
+      break;
+    case SYS_CLOSE:                  //  Close a file.
+      {
+        CHECK_ARGS (args, 1, false);
+        /* Fail when closing a wrong fd. */
+        if (!check_fd(trd, args[1]) || args[1] < 3)
+          EXIT_WITH_ERROR;
+        file_close(trd->file_descriptors[args[1]]);
+        trd->file_descriptors[args[1]] = NULL;
+        break;
+      }
     case SYS_PRACTICE:               //  Returns arg incremented by 1
       check_arguments(args, 1, false);
       f->eax = args[1] + 1;
