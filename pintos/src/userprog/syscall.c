@@ -7,6 +7,8 @@
 #include "threads/vaddr.h"
 #include "filesys/file.h"
 #include "filesys/filesys.h"
+#include "devices/input.h"
+
 
 #define MAX_SYSCALL_ARGUMENTS     10
 
@@ -23,7 +25,9 @@ if (!check_arguments((args), (count), __VA_ARGS__)) EXIT_WITH_ERROR
 
 static void syscall_handler (struct intr_frame *);
 
-static void write_syscall (struct intr_frame *, uint32_t*);
+static void write_syscall (struct intr_frame *, uint32_t*, struct thread*);
+static void read_syscall (struct intr_frame *, uint32_t*, struct thread*);
+
 
 void
 syscall_init (void)
@@ -141,9 +145,10 @@ syscall_handler (struct intr_frame *f)
       }
     case SYS_FILESIZE:               //  Obtain a file's size. 
     case SYS_READ:                   //  Read from a file.
+      read_syscall (f, args, trd);
       break;
     case SYS_WRITE:                  //  Write to a file.
-      write_syscall (f, args);
+      write_syscall (f, args, trd);
       break;
     case SYS_SEEK:                   //  Change position in a file. 
     case SYS_TELL:                   //  Report current position in a file.
@@ -167,18 +172,57 @@ syscall_handler (struct intr_frame *f)
     }
 }
 
+static size_t
+getbuf (char *buffer, size_t length)
+{
+  size_t i = 0;
+  char c;
+
+  for (; i < length; i++)
+    {
+      c = input_getc ();
+      if (c == '\n' || c == '\r')
+        {
+          buffer[i] = '\0';
+          return i + 1;
+        }
+      buffer[i] = c;
+    }
+  return i;
+}
+
 static void 
-write_syscall (struct intr_frame *f, uint32_t* args)
+read_syscall (struct intr_frame *f, uint32_t* args, struct thread* trd)
 {
   CHECK_ARGS (args, 3, false, true, false);
-
-  struct thread * trd = thread_current ();
 
   int fd = (int) args[1];
   char *buffer = (char *) args[2];
   int length = (int) args[3];
 
-  if (args[1] == 1 || args[1] == 2)
+  if (!fd)
+    {
+      f->eax = getbuf (buffer, length);
+      return;
+    }
+
+  /* Fail when reading a wrong fd or standard output */
+  if (!check_fd(trd, fd) || fd == 1)
+      EXIT_WITH_ERROR;
+
+  f->eax = file_read (trd->file_descriptors[fd], buffer, length);
+}
+
+static void 
+write_syscall (struct intr_frame *f, uint32_t* args, struct thread* trd)
+{
+  CHECK_ARGS (args, 3, false, true, false);
+
+  int fd = (int) args[1];
+  char *buffer = (char *) args[2];
+  int length = (int) args[3];
+
+  if (fd == 1 || fd == 2)
     {
       putbuf (buffer, length);
       f->eax = length;
@@ -186,7 +230,7 @@ write_syscall (struct intr_frame *f, uint32_t* args)
     }
 
   /* Fail when writing a wrong fd or standard input */
-  if (!check_fd(trd, args[1]) || !args[1])
+  if (!check_fd(trd, fd) || !fd)
       EXIT_WITH_ERROR;
 
   f->eax = file_write (trd->file_descriptors[fd], buffer, length);
