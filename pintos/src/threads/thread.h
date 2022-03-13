@@ -19,6 +19,7 @@ enum thread_status
 /* Thread identifier type.
    You can redefine this to whatever type you like. */
 typedef int tid_t;
+typedef int pid_t;
 #define TID_ERROR ((tid_t) -1)          /* Error value for tid_t. */
 
 /* Thread priorities. */
@@ -84,6 +85,24 @@ typedef int tid_t;
    only because they are mutually exclusive: only a thread in the
    ready state is on the run queue, whereas only a thread in the
    blocked state is on a semaphore wait list. */
+
+struct child_parent_status
+  {
+    pid_t pid;
+
+    int exit_code;
+
+    bool is_finished;
+
+    struct list_elem elem;
+
+    struct semaphore sema; // init to 0
+
+    int ref_count; // at first it is 2 showing number of threads working with this status
+
+    struct lock lock; // for locking ref_count
+
+  };
 struct thread
   {
     /* Owned by thread.c. */
@@ -104,7 +123,8 @@ struct thread
 
     /* Owned by userprog/syscall.c */
     struct file* file_descriptors[MAX_FILE_DESCRIPTORS];
-
+    struct list children;
+    struct child_parent_status cps;
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
   };

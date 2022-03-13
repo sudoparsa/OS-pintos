@@ -487,11 +487,9 @@ static bool
 fill_args_in_stack (void **esp)
 {
   /* Put arguments on stack and update argv accordingly. */
-//  printf("###############  filling in...  ###############\n");
-//  printf("argc: %d\n", argc);
   for (int i = 0; i < argc; i ++)
     {
-//      printf("argv[%d]: %s\n", i, argv[i]);
+
       const size_t len = strnlen(argv[i], MAX_ARGUMENT_LENGTH) + 1;
       *esp -= len;
       if (len > MAX_ARGUMENT_LENGTH)
@@ -502,9 +500,13 @@ fill_args_in_stack (void **esp)
     }
 
   /* Align stack. */
-  const int align_size = ((size_t) *esp) % 4 + ((argc + 3) % 4) * 4;
+  const int align_size = ((size_t)(*esp) - ((argc + 3) * 4 )) % 16;
+//  *esp -= (argc + 3) * 4;
+//  *esp -= (size_t)(*esp) % 16;
+//  *esp += (argc + 3) * 4;
   *esp -= align_size;
-  memset (*esp, 0, align_size);
+//  *esp -= align_size;
+  memset (*esp, 0x11, align_size);
 
   /* Put argv[argc]. */
   *esp -= 4;
@@ -522,7 +524,6 @@ fill_args_in_stack (void **esp)
 
   /* Put return address. */
   *esp -= 4;
-//  hex_dump(*esp, *esp, (void*)0xc0000000 - *esp, true);
   return true;
 }
 

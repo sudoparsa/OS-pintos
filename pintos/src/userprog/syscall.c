@@ -1,3 +1,4 @@
+
 #include "userprog/syscall.h"
 #include "userprog/pagedir.h"
 #include <stdio.h>
@@ -8,9 +9,10 @@
 #include "filesys/file.h"
 #include "filesys/filesys.h"
 #include "devices/input.h"
-
+#include "devices/shutdown.h"
 
 #define MAX_SYSCALL_ARGUMENTS     10
+
 
 
 #define CHECK_ARGS(args, count, ...) \
@@ -19,7 +21,7 @@ if (!check_arguments((args), (count), __VA_ARGS__)) EXIT_WITH_ERROR
 #define EXIT_WITH_ERROR \
 { \
   printf ("%s: exit(%d)\n", thread_current ()->name, -1); \
-  thread_exit (); \
+  thread_exit ();       \
   return; \
 }
 
@@ -37,6 +39,7 @@ static void tell_syscall (struct intr_frame *, uint32_t*, struct thread*);
 void
 syscall_init (void)
 {
+
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
@@ -63,6 +66,7 @@ check_arguments(uint32_t* array, uint32_t arg_count, uint32_t is_address, ...)
   if (arg_count > MAX_SYSCALL_ARGUMENTS)
     return false;
 
+
   if (!is_user_mapped_memory(array) || !is_user_mapped_memory((void *)(array + arg_count + 1) - 1))
     return false;
 
@@ -77,6 +81,8 @@ check_arguments(uint32_t* array, uint32_t arg_count, uint32_t is_address, ...)
       return false;
   }
   va_end (args);
+
+
 
   return true;
 }
@@ -123,7 +129,7 @@ syscall_handler (struct intr_frame *f)
       printf ("%s: exit(%d)\n", trd->name, args[1]);
       thread_exit ();
       break;
-    case SYS_HALT:                   //  Halt the operating system.
+    case SYS_HALT: shutdown_power_off();                  //  Halt the operating system.
     case SYS_EXEC:                   //  Start another process.
     case SYS_WAIT:                   //  Wait for a child process to die.
       break;
@@ -237,7 +243,9 @@ write_syscall (struct intr_frame *f, uint32_t* args, struct thread* trd)
       putbuf (buffer, length);
       f->eax = length;
       return;
+
     }
+
 
   /* Fail when writing a wrong fd or standard input */
   if (!check_fd(trd, fd) || !fd)
@@ -249,6 +257,7 @@ write_syscall (struct intr_frame *f, uint32_t* args, struct thread* trd)
 static void 
 filesize_syscall (struct intr_frame *f, uint32_t* args, struct thread* trd)
 {
+
   CHECK_ARGS(args, 1, false);
 
   int fd = (int) args[1];
