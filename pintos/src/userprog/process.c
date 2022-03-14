@@ -501,11 +501,7 @@ fill_args_in_stack (void **esp)
 
   /* Align stack. */
   const int align_size = ((size_t)(*esp) - ((argc + 3) * 4 )) % 16;
-//  *esp -= (argc + 3) * 4;
-//  *esp -= (size_t)(*esp) % 16;
-//  *esp += (argc + 3) * 4;
   *esp -= align_size;
-//  *esp -= align_size;
   memset (*esp, 0x11, align_size);
 
   /* Put argv[argc]. */

@@ -126,7 +126,7 @@ struct child_parent_status {
 
   struct semaphore sema; // init to 0
 
-  int ref_count // at first it is 2 showing number of threads working with this status
+  int ref_count; // at first it is 2 showing number of threads working with this status
 
   struct lock lock; // for locking ref_count
 
