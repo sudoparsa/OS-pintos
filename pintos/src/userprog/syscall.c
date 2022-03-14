@@ -13,18 +13,6 @@
 
 #define MAX_SYSCALL_ARGUMENTS     10
 
-
-
-#define CHECK_ARGS(args, count, ...) \
-if (!check_arguments((args), (count), __VA_ARGS__)) EXIT_WITH_ERROR
-
-#define EXIT_WITH_ERROR \
-{ \
-  printf ("%s: exit(%d)\n", thread_current ()->name, -1); \
-  thread_exit ();       \
-  return; \
-}
-
 static void syscall_handler (struct intr_frame *);
 
 static void write_syscall (struct intr_frame *, uint32_t*, struct thread*);
