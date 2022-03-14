@@ -20,6 +20,8 @@ static void read_syscall (struct intr_frame *, uint32_t*, struct thread*);
 static void filesize_syscall (struct intr_frame *, uint32_t*, struct thread*);
 static void seek_syscall (struct intr_frame *, uint32_t*, struct thread*);
 static void tell_syscall (struct intr_frame *, uint32_t*, struct thread*);
+static void exec_syscall (struct intr_frame *, uint32_t*);
+static void wait_syscall (struct intr_frame *, uint32_t*);
 
 
 
@@ -52,21 +54,33 @@ static bool
 check_arguments(uint32_t* array, uint32_t arg_count, uint32_t is_address, ...)
 {
   if (arg_count > MAX_SYSCALL_ARGUMENTS)
+  {
+    thread_current ()->cps->exit_code = -1;
     return false;
+  }
 
 
   if (!is_user_mapped_memory(array) || !is_user_mapped_memory((void *)(array + arg_count + 1) - 1))
+  {
+    thread_current ()->cps->exit_code = -1;
     return false;
+  }
 
   if (is_address && !is_user_mapped_memory((void *) array[1]))
+  {
+    thread_current ()->cps->exit_code = -1;
     return false;
+  }
 
   va_list args;
   va_start (args, is_address);
   for (size_t i = 2; i <= arg_count; i ++) {
     bool should_check_address = va_arg (args, int);
     if (should_check_address && !is_user_mapped_memory((void *)array[i]))
+    {
+      thread_current ()->cps->exit_code = -1;
       return false;
+    }
   }
   va_end (args);
 
@@ -94,6 +108,8 @@ syscall_handler (struct intr_frame *f)
 {
   if (!is_kernel_vaddr(f) || !is_kernel_vaddr((void *)(f + 1) - 1))
     EXIT_WITH_ERROR;
+  
+    
 
   uint32_t* args = ((uint32_t*) f->esp);
 
@@ -111,15 +127,18 @@ syscall_handler (struct intr_frame *f)
 
   switch (args[0])
     {
-    case SYS_EXIT:                   //  Terminate this process.
+    case SYS_EXIT:                  //  Terminate this process.
       CHECK_ARGS(args, 1, false);
       f->eax = args[1];
+      trd->cps->exit_code = args[1];
       printf ("%s: exit(%d)\n", trd->name, args[1]);
       thread_exit ();
       break;
     case SYS_HALT: shutdown_power_off();                  //  Halt the operating system.
-    case SYS_EXEC:                   //  Start another process.
-    case SYS_WAIT:                   //  Wait for a child process to die.
+      break;
+    case SYS_EXEC: exec_syscall(f, args);                  //  Start another process.
+      break;
+    case SYS_WAIT: wait_syscall(f, args);                  //  Wait for a child process to die.
       break;
     case SYS_CREATE:                 //  Create a file.
       CHECK_ARGS (args, 2, true, false);
@@ -193,6 +212,22 @@ getbuf (char *buffer, size_t length)
       buffer[i] = c;
     }
   return i;
+}
+
+static void
+exec_syscall (struct intr_frame *f, uint32_t* args)
+{
+  CHECK_ARGS (args, 1, true);
+
+  f->eax = process_execute((char*) args[1]);
+}
+
+static void
+wait_syscall (struct intr_frame *f, uint32_t* args)
+{
+  CHECK_ARGS (args, 1, false);
+
+  f->eax = process_wait((tid_t) args[1]);
 }
 
 static void 

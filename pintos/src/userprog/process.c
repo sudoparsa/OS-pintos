@@ -31,6 +31,8 @@ static struct semaphore temporary;
 static thread_func start_process NO_RETURN;
 static bool load (char *cmdline, void (**eip) (void), void **esp);
 
+static void free_finished_threads(struct list *threads);
+
 /* Tokenizes the cmd_line provided as the input, and sets argc and
  * argv variables accordingly, returns true on sucess, and false
  * otherwise. */
@@ -60,6 +62,7 @@ tokenize(char* cmd_line)
   return true;
 }
 
+
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
    before process_execute() returns.  Returns the new process's
@@ -69,6 +72,18 @@ process_execute (const char *file_name)
 {
   char *fn_copy;
   tid_t tid;
+  struct fn_cps *fn_cps_ = malloc (sizeof (struct fn_cps));
+
+  struct child_parent_status *cps = malloc (sizeof (struct child_parent_status));
+  cps->ref_count = 2;
+  cps->is_finished = false;
+  sema_init (&cps->sema, 0);
+  lock_init(&cps->lock);
+
+  fn_cps_->cps = cps;
+  struct thread *cur = thread_current ();
+  list_push_back (&(cur->children), &(cps->elem)); 
+
 
   sema_init (&temporary, 0);
   /* Make a copy of FILE_NAME.
@@ -77,20 +92,31 @@ process_execute (const char *file_name)
   if (fn_copy == NULL)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
-
+  
+  fn_cps_->fn = fn_copy;
   /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
+  tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_cps_);
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy);
+  else {
+    sema_down(&cps->sema);
+  }
   return tid;
 }
 
 /* A thread function that loads a user process and starts it
    running. */
 static void
-start_process (void *file_name_)
+start_process (void *fn)
 {
-  char *file_name = file_name_;
+  struct fn_cps *fn_cps_ = (struct fn_cps *) fn;
+  struct child_parent_status *cps = fn_cps_->cps;
+  // Set associated thread with the cps
+  struct thread *cur = thread_current ();
+  cur->cps = cps;
+  cps->pid = cur->tid;
+
+  char *file_name = fn_cps_->fn;
   struct intr_frame if_;
   bool success;
 
@@ -104,7 +130,13 @@ start_process (void *file_name_)
   /* If load failed, quit. */
   palloc_free_page (file_name);
   if (!success)
+  {
+    cps->exit_code = -1;
+    sema_up(&cps->sema);
     thread_exit ();
+  }
+
+  sema_up(&cps->sema);
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -128,8 +160,26 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid UNUSED)
 {
-  sema_down (&temporary);
-  return 0;
+  struct thread *cur = thread_current ();
+  struct child_parent_status *child = NULL;
+  struct list_elem *e;
+
+  for (e = list_begin (&(cur->children)); e != list_end (&(cur->children)); e = list_next (e))
+    {
+      child = list_entry (e, struct child_parent_status, elem);
+
+      if (child->pid == (pid_t) child_tid)
+          break;
+      
+      child = NULL;
+    }
+
+  if (child == NULL)
+    return -1;
+  
+  sema_down (&(child->sema));
+  list_remove(&child->elem);
+  return child->exit_code;
 }
 
 /* Free the current process's resources. */
@@ -137,8 +187,18 @@ void
 process_exit (void)
 {
   struct thread *cur = thread_current ();
-  uint32_t *pd;
 
+  lock_acquire (&(cur->cps->lock));
+  (cur->cps->ref_count)--;
+  lock_release (&(cur->cps->lock));
+  sema_up (&(cur->cps->sema));
+
+  if (cur->cps->ref_count == 0)
+    free (cur->cps);
+  
+  free_finished_threads(&cur->children);
+
+  uint32_t *pd;
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
   pd = cur->pagedir;
@@ -155,7 +215,30 @@ process_exit (void)
       pagedir_activate (NULL);
       pagedir_destroy (pd);
     }
-  sema_up (&temporary);
+}
+
+static void
+free_finished_threads(struct list *threads)
+{
+  struct child_parent_status *finished_threads[list_size (threads)];
+  int size = 0;
+  struct list_elem *e;
+  struct child_parent_status *child;
+
+  for (e = list_begin (threads); e != list_end (threads); e = list_next (e))
+    {
+      child = list_entry (e, struct child_parent_status, elem);
+      lock_acquire(&(child->lock));
+      (child->ref_count)--;
+      lock_release(&(child->lock));
+
+      if (child->ref_count == 0)
+          finished_threads[size++] = child;
+    }
+  int i;
+  for (i = 0; i < size; i++)
+    free (finished_threads[i]);
+  return finished_threads;
 }
 
 /* Sets up the CPU for running user code in the current

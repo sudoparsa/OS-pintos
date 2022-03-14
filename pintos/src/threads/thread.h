@@ -103,6 +103,13 @@ struct child_parent_status
     struct lock lock; // for locking ref_count
 
   };
+
+struct fn_cps
+  {
+    char *fn;
+    struct child_parent_status *cps;
+  };
+
 struct thread
   {
     /* Owned by thread.c. */
@@ -124,7 +131,7 @@ struct thread
     /* Owned by userprog/syscall.c */
     struct file* file_descriptors[MAX_FILE_DESCRIPTORS];
     struct list children;
-    struct child_parent_status cps;
+    struct child_parent_status *cps;
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
   };
