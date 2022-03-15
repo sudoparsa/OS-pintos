@@ -181,7 +181,9 @@ syscall_handler (struct intr_frame *f)
           {
             trd->file_descriptors[fd] = filesys_open ((const char *) args[1]);
             if (trd->file_descriptors[fd] == NULL)
+            {
               f->eax = -1;
+            }
           }
         break;
       }
@@ -205,7 +207,10 @@ syscall_handler (struct intr_frame *f)
         CHECK_ARGS (args, 1, VALUE);
         /* Fail when closing a wrong fd. */
         if (!check_fd(trd, args[1]) || args[1] < 3)
+        {
+          trd->cps->exit_code = -1;
           EXIT_WITH_ERROR;
+        }
         file_close(trd->file_descriptors[args[1]]);
         trd->file_descriptors[args[1]] = NULL;
         break;
