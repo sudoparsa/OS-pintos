@@ -98,9 +98,8 @@ process_execute (const char *file_name)
   tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_cps_);
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy);
-  else {
+  else
     sema_down(&cps->sema);
-  }
   if (!fn_cps_->success) return TID_ERROR;
   return tid;
 }

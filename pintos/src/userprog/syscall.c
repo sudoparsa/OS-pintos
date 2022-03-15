@@ -12,6 +12,8 @@
 #include "devices/shutdown.h"
 
 #define MAX_SYSCALL_ARGUMENTS     10
+#define STRING -1
+#define VALUE 0
 
 static void syscall_handler (struct intr_frame *);
 
@@ -36,9 +38,30 @@ syscall_init (void)
 static bool
 is_user_mapped_memory(const void *address)
 {
+  bool result = false;
   if (is_user_vaddr(address))
-    return (pagedir_get_page(thread_current ()->pagedir, address) != NULL);
-  return false;
+    result = (pagedir_get_page(thread_current ()->pagedir, address) != NULL);
+  return result;
+}
+
+static bool
+check_address (uint32_t array, int address_size)
+{
+  if (address_size > 0)
+    {
+      if (!is_user_mapped_memory(((void *)array)) ||
+       !is_user_mapped_memory(((void *)array) + address_size - 1))
+        return false;
+    } else if (address_size < 0) {
+      int offset = 0;
+      while (is_user_mapped_memory(((void *)array) + offset) && *((char *)array + offset) != 0)
+      {
+        offset++;
+      }
+      if (!is_user_mapped_memory(((void *)array) + offset))
+        return false;
+    }
+  return true;
 }
 
 /* Checks if arguments for a system call are valid. It
@@ -51,7 +74,7 @@ is_user_mapped_memory(const void *address)
  * last one of them is an address.
  */
 static bool
-check_arguments(uint32_t* array, uint32_t arg_count, uint32_t is_address, ...)
+check_arguments(uint32_t* array, uint32_t arg_count, int32_t is_address, ...)
 {
   if (arg_count > MAX_SYSCALL_ARGUMENTS)
   {
@@ -65,8 +88,8 @@ check_arguments(uint32_t* array, uint32_t arg_count, uint32_t is_address, ...)
     thread_current ()->cps->exit_code = -1;
     return false;
   }
-
-  if (is_address && !is_user_mapped_memory((void *) array[1]))
+ 
+  if (arg_count > 0 && !check_address(array[1], is_address))
   {
     thread_current ()->cps->exit_code = -1;
     return false;
@@ -74,9 +97,10 @@ check_arguments(uint32_t* array, uint32_t arg_count, uint32_t is_address, ...)
 
   va_list args;
   va_start (args, is_address);
-  for (size_t i = 2; i <= arg_count; i ++) {
-    bool should_check_address = va_arg (args, int);
-    if (should_check_address && !is_user_mapped_memory((void *)array[i]))
+  for (size_t i = 2; i <= arg_count; i ++)
+  {
+    int address_size = va_arg (args, int);
+    if (!check_address(array[i], address_size))
     {
       thread_current ()->cps->exit_code = -1;
       return false;
@@ -122,13 +146,13 @@ syscall_handler (struct intr_frame *f)
 
   /*printf("System call number: %d\n", args[0]);*/
 
-  CHECK_ARGS(args, 0, false);
+  CHECK_ARGS(args, 0, VALUE);
   struct thread * trd = thread_current ();
 
   switch (args[0])
     {
     case SYS_EXIT:                  //  Terminate this process.
-      CHECK_ARGS(args, 1, false);
+      CHECK_ARGS(args, 1, VALUE);
       f->eax = args[1];
       trd->cps->exit_code = args[1];
       printf ("%s: exit(%d)\n", trd->name, args[1]);
@@ -141,16 +165,16 @@ syscall_handler (struct intr_frame *f)
     case SYS_WAIT: wait_syscall(f, args);                  //  Wait for a child process to die.
       break;
     case SYS_CREATE:                 //  Create a file.
-      CHECK_ARGS (args, 2, true, false);
+      CHECK_ARGS (args, 2, STRING, VALUE);
       f->eax = filesys_create ((const char *) args[1], args[2]);
       break;
     case SYS_REMOVE:                 //  Delete a file.
-      CHECK_ARGS (args, 1, true);
+      CHECK_ARGS (args, 1, STRING);
       f->eax = filesys_remove ((const char *) args[1]);
       break;
     case SYS_OPEN:                   //  Open a file.
       {
-        CHECK_ARGS (args, 1, true);
+        CHECK_ARGS (args, 1, STRING);
         int fd = thread_get_free_file_descriptor (trd);
         f->eax = fd;
         if (fd > 0)
@@ -178,7 +202,7 @@ syscall_handler (struct intr_frame *f)
       break;
     case SYS_CLOSE:                  //  Close a file.
       {
-        CHECK_ARGS (args, 1, false);
+        CHECK_ARGS (args, 1, VALUE);
         /* Fail when closing a wrong fd. */
         if (!check_fd(trd, args[1]) || args[1] < 3)
           EXIT_WITH_ERROR;
@@ -217,15 +241,15 @@ getbuf (char *buffer, size_t length)
 static void
 exec_syscall (struct intr_frame *f, uint32_t* args)
 {
-  CHECK_ARGS (args, 1, true);
+  CHECK_ARGS (args, 1, STRING);
 
-  f->eax = process_execute((char*) args[1]);
+  f->eax = process_execute((const char*) args[1]);
 }
 
 static void
 wait_syscall (struct intr_frame *f, uint32_t* args)
 {
-  CHECK_ARGS (args, 1, false);
+  CHECK_ARGS (args, 1, VALUE);
 
   f->eax = process_wait((tid_t) args[1]);
 }
@@ -233,10 +257,10 @@ wait_syscall (struct intr_frame *f, uint32_t* args)
 static void 
 read_syscall (struct intr_frame *f, uint32_t* args, struct thread* trd)
 {
-  CHECK_ARGS (args, 3, false, true, false);
+  CHECK_ARGS (args, 3, VALUE, STRING, VALUE);
 
   int fd = (int) args[1];
-  char *buffer = (char *) args[2];
+  const char *buffer = (const char *) args[2];
   int length = (int) args[3];
 
   if (!fd)
@@ -255,10 +279,10 @@ read_syscall (struct intr_frame *f, uint32_t* args, struct thread* trd)
 static void 
 write_syscall (struct intr_frame *f, uint32_t* args, struct thread* trd)
 {
-  CHECK_ARGS (args, 3, false, true, false);
+  CHECK_ARGS (args, 3, VALUE, STRING, VALUE);
 
   int fd = (int) args[1];
-  char *buffer = (char *) args[2];
+  const char *buffer = (const char *) args[2];
   int length = (int) args[3];
 
   if (fd == 1 || fd == 2)
@@ -281,7 +305,7 @@ static void
 filesize_syscall (struct intr_frame *f, uint32_t* args, struct thread* trd)
 {
 
-  CHECK_ARGS(args, 1, false);
+  CHECK_ARGS(args, 1, VALUE);
 
   int fd = (int) args[1];
 
@@ -295,7 +319,7 @@ filesize_syscall (struct intr_frame *f, uint32_t* args, struct thread* trd)
 static void 
 tell_syscall (struct intr_frame *f, uint32_t* args, struct thread* trd)
 {
-  CHECK_ARGS(args, 1, false);
+  CHECK_ARGS(args, 1, VALUE);
 
   int fd = args[1];
 
@@ -309,7 +333,7 @@ tell_syscall (struct intr_frame *f, uint32_t* args, struct thread* trd)
 static void 
 seek_syscall (struct intr_frame *f, uint32_t* args, struct thread* trd)
 {
-  CHECK_ARGS(args, 2, false, false);
+  CHECK_ARGS(args, 2, VALUE, VALUE);
 
   int fd = args[1];
   int position = args[2];
