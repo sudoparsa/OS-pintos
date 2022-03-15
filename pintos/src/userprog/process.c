@@ -216,6 +216,7 @@ process_exit (void)
       pagedir_activate (NULL);
       pagedir_destroy (pd);
     }
+    file_close (cur->process_file);
 }
 
 static void
@@ -364,11 +365,13 @@ load (char *file_name, void (**eip) (void), void **esp)
 
   /* Open executable file. */
   file = filesys_open (argv[0]);
+  t->process_file = file;
   if (file == NULL)
     {
       printf ("load: %s: open failed\n", file_name);
       goto done;
     }
+  file_deny_write(file);
 
   /* Read and verify executable header. */
   if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
@@ -453,7 +456,7 @@ load (char *file_name, void (**eip) (void), void **esp)
 
  done:
   /* We arrive here whether the load is successful or not. */
-  file_close (file);
+  // file_close (file);
   return success;
 }
 

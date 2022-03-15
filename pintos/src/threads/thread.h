@@ -131,6 +131,7 @@ struct thread
 
     /* Owned by userprog/syscall.c */
     struct file* file_descriptors[MAX_FILE_DESCRIPTORS];
+    struct file* process_file;
     struct list children;
     struct child_parent_status *cps;
     /* Owned by thread.c. */
