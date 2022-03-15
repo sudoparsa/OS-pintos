@@ -101,6 +101,7 @@ process_execute (const char *file_name)
   else {
     sema_down(&cps->sema);
   }
+  if (!fn_cps_->success) return TID_ERROR;
   return tid;
 }
 
@@ -126,6 +127,7 @@ start_process (void *fn)
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (file_name, &if_.eip, &if_.esp);
+  fn_cps_->success = success;
 
   /* If load failed, quit. */
   palloc_free_page (file_name);

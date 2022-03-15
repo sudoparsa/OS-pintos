@@ -108,6 +108,7 @@ struct fn_cps
   {
     char *fn;
     struct child_parent_status *cps;
+    bool success;
   };
 
 struct thread
