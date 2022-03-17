@@ -76,7 +76,6 @@ process_execute (const char *file_name)
 
   struct child_parent_status *cps = malloc (sizeof (struct child_parent_status));
   cps->ref_count = 2;
-  cps->is_finished = false;
   sema_init (&cps->sema, 0);
   lock_init(&cps->lock);
 
@@ -100,7 +99,12 @@ process_execute (const char *file_name)
     palloc_free_page (fn_copy);
   else
     sema_down(&cps->sema);
-  if (!fn_cps_->success) return TID_ERROR;
+  if (!fn_cps_->success)
+  {
+    free(fn_cps_);
+    return TID_ERROR;
+  }
+  free(fn_cps_);
   return tid;
 }
 
@@ -128,8 +132,8 @@ start_process (void *fn)
   success = load (file_name, &if_.eip, &if_.esp);
   fn_cps_->success = success;
 
-  /* If load failed, quit. */
   palloc_free_page (file_name);
+  /* If load failed, quit. */
   if (!success)
   {
     cps->exit_code = -1;
@@ -183,6 +187,17 @@ process_wait (tid_t child_tid UNUSED)
   return child->exit_code;
 }
 
+void
+free_file_descriptors(struct thread *cur)
+{
+  int i;
+  for (i = 0; i < MAX_FILE_DESCRIPTORS; i++)
+  {
+    if (cur->file_descriptors[i] != NULL)
+      file_close(cur->file_descriptors[i]);
+  }
+}
+
 /* Free the current process's resources. */
 void
 process_exit (void)
@@ -198,6 +213,8 @@ process_exit (void)
     free (cur->cps);
   
   free_finished_threads(&cur->children);
+
+  free_file_descriptors(cur);
 
   uint32_t *pd;
   /* Destroy the current process's page directory and switch back

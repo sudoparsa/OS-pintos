@@ -92,8 +92,6 @@ struct child_parent_status
 
     int exit_code;
 
-    bool is_finished;
-
     struct list_elem elem;
 
     struct semaphore sema; // init to 0
@@ -106,9 +104,11 @@ struct child_parent_status
 
 struct fn_cps
   {
-    char *fn;
-    struct child_parent_status *cps;
-    bool success;
+    char *fn; // file name
+
+    struct child_parent_status *cps; // child parent status
+
+    bool success; // boolean to show load result
   };
 
 struct thread
