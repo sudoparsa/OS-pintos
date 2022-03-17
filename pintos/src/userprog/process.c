@@ -76,7 +76,6 @@ process_execute (const char *file_name)
 
   struct child_parent_status *cps = malloc (sizeof (struct child_parent_status));
   cps->ref_count = 2;
-  cps->is_finished = false;
   sema_init (&cps->sema, 0);
   lock_init(&cps->lock);
 
