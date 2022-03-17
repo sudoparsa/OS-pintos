@@ -164,8 +164,6 @@ page_fault (struct intr_frame *f)
          write ? "writing" : "reading",
          user ? "user" : "kernel");
 
-  f->eax = -1;
-  thread_current()->cps->exit_code = -1;
   EXIT_WITH_ERROR;
 
   kill (f);
