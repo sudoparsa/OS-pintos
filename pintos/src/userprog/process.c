@@ -32,8 +32,8 @@ static struct semaphore temporary;
 static thread_func start_process NO_RETURN;
 static bool load (char *cmdline, void (**eip) (void), void **esp);
 
-static void free_finished_threads(struct list *threads);
-static void free_file_descriptors(struct thread *);
+static void free_finished_threads (struct list *threads);
+static void free_file_descriptors (struct thread *);
 
 /* Tokenizes the cmd_line provided as the input, and sets argc and
  * argv variables accordingly, returns true on sucess, and false

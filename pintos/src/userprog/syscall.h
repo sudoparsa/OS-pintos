@@ -13,6 +13,8 @@ if (!check_arguments((args), (count), __VA_ARGS__)) EXIT_WITH_ERROR
   return;                                                   \
 }
 
+struct lock global_lock;    /* Lock for file system call synchronizaion */
+
 void syscall_init (void);
 
 #endif /* userprog/syscall.h */
