@@ -4,7 +4,7 @@
 
 >> نام، نام خانوادگی و ایمیل خود را در ادامه وارد کنید.
 
-نام نام خانوادگی <email@domain.example>
+پارسا حسینی <sp.hoseiny@gmail.com>
 
 نام نام خانوادگی <email@domain.example>
 
