@@ -18,6 +18,7 @@
 #include "threads/synch.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "threads/malloc.h"
 
 #define MAX_ARGUMENTS        32
 #define MAX_ARGUMENT_LENGTH  1024
@@ -31,13 +32,14 @@ static struct semaphore temporary;
 static thread_func start_process NO_RETURN;
 static bool load (char *cmdline, void (**eip) (void), void **esp);
 
-static void free_finished_threads(struct list *threads);
+static void free_finished_threads (struct list *threads);
+static void free_file_descriptors (struct thread *);
 
 /* Tokenizes the cmd_line provided as the input, and sets argc and
  * argv variables accordingly, returns true on sucess, and false
  * otherwise. */
 bool
-tokenize(char* cmd_line)
+tokenize (char* cmd_line)
 {
   int i;
   char *c;
@@ -47,16 +49,16 @@ tokenize(char* cmd_line)
 
   argc = 0;
   char* strtok_saveptr;
-  c = strtok_r(cmd_line, ARGUMENT_DELIMITER, &strtok_saveptr);  /* Start tokenizer on the input */
+  c = strtok_r (cmd_line, ARGUMENT_DELIMITER, &strtok_saveptr);  /* Start tokenizer on the input */
   for (i = 0; c && (i < MAX_ARGUMENTS); ++ i)
     {
       argv[i] = c;
       argc ++;
-      c = strtok_r(NULL, ARGUMENT_DELIMITER, &strtok_saveptr);  /* scan for next token */
+      c = strtok_r (NULL, ARGUMENT_DELIMITER, &strtok_saveptr);  /* scan for next token */
     }
 
   /* Return false if we ran out of space on argv. */
-  if (strtok_r(NULL, ARGUMENT_DELIMITER, &strtok_saveptr) != NULL)
+  if (strtok_r (NULL, ARGUMENT_DELIMITER, &strtok_saveptr) != NULL)
     return false;
 
   return true;
@@ -76,9 +78,8 @@ process_execute (const char *file_name)
 
   struct child_parent_status *cps = malloc (sizeof (struct child_parent_status));
   cps->ref_count = 2;
-  cps->is_finished = false;
   sema_init (&cps->sema, 0);
-  lock_init(&cps->lock);
+  lock_init (&cps->lock);
 
   fn_cps_->cps = cps;
   struct thread *cur = thread_current ();
@@ -94,13 +95,19 @@ process_execute (const char *file_name)
   strlcpy (fn_copy, file_name, PGSIZE);
   
   fn_cps_->fn = fn_copy;
+
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_cps_);
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy);
   else
-    sema_down(&cps->sema);
-  if (!fn_cps_->success) return TID_ERROR;
+    sema_down (&cps->sema);
+  if (!fn_cps_->success)
+    {
+      free (fn_cps_);
+      return TID_ERROR;
+    }
+  free (fn_cps_);
   return tid;
 }
 
@@ -128,16 +135,17 @@ start_process (void *fn)
   success = load (file_name, &if_.eip, &if_.esp);
   fn_cps_->success = success;
 
-  /* If load failed, quit. */
   palloc_free_page (file_name);
-  if (!success)
-  {
-    cps->exit_code = -1;
-    sema_up(&cps->sema);
-    thread_exit ();
-  }
 
-  sema_up(&cps->sema);
+  /* If load failed, quit. */
+  if (!success)
+    {
+      cps->exit_code = -1;
+      sema_up (&cps->sema);
+      thread_exit ();
+    }
+
+  sema_up (&cps->sema);
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -179,8 +187,19 @@ process_wait (tid_t child_tid UNUSED)
     return -1;
   
   sema_down (&(child->sema));
-  list_remove(&child->elem);
+  list_remove (&child->elem);
   return child->exit_code;
+}
+
+static void
+free_file_descriptors (struct thread *cur)
+{
+  int i;
+  for (i = 0; i < MAX_FILE_DESCRIPTORS; i++)
+    {
+      if (cur->file_descriptors[i] != NULL)
+        file_close (cur->file_descriptors[i]);
+    }
 }
 
 /* Free the current process's resources. */
@@ -197,7 +216,9 @@ process_exit (void)
   if (cur->cps->ref_count == 0)
     free (cur->cps);
   
-  free_finished_threads(&cur->children);
+  free_finished_threads (&cur->children);
+
+  free_file_descriptors (cur);
 
   uint32_t *pd;
   /* Destroy the current process's page directory and switch back
@@ -216,11 +237,11 @@ process_exit (void)
       pagedir_activate (NULL);
       pagedir_destroy (pd);
     }
-    file_close (cur->process_file);
+  file_close (cur->process_file);
 }
 
 static void
-free_finished_threads(struct list *threads)
+free_finished_threads (struct list *threads)
 {
   struct child_parent_status *finished_threads[list_size (threads)];
   int size = 0;
@@ -230,9 +251,9 @@ free_finished_threads(struct list *threads)
   for (e = list_begin (threads); e != list_end (threads); e = list_next (e))
     {
       child = list_entry (e, struct child_parent_status, elem);
-      lock_acquire(&(child->lock));
+      lock_acquire (&(child->lock));
       (child->ref_count)--;
-      lock_release(&(child->lock));
+      lock_release (&(child->lock));
 
       if (child->ref_count == 0)
           finished_threads[size++] = child;
@@ -240,7 +261,6 @@ free_finished_threads(struct list *threads)
   int i;
   for (i = 0; i < size; i++)
     free (finished_threads[i]);
-  return finished_threads;
 }
 
 /* Sets up the CPU for running user code in the current
@@ -349,19 +369,19 @@ load (char *file_name, void (**eip) (void), void **esp)
   process_activate ();
 
   /* Fill argc and argv. */
-  if (!tokenize(file_name))
+  if (!tokenize (file_name))
     {
       printf ("load: %s: cannot tokenize\n", file_name);
       goto done;
     }
   if (argc < 1)
     {
-      printf("load: cannot run program with no args.\n");
+      printf ("load: cannot run program with no args.\n");
       goto done;
     }
 
-  memcpy(thread_current()->name, argv[0], 15);
-  thread_current()->name[15] = '\0';
+  memcpy (thread_current ()->name, argv[0], 15);
+  thread_current ()->name[15] = '\0';
 
   /* Open executable file. */
   file = filesys_open (argv[0]);
@@ -371,7 +391,7 @@ load (char *file_name, void (**eip) (void), void **esp)
       printf ("load: %s: open failed\n", file_name);
       goto done;
     }
-  file_deny_write(file);
+  file_deny_write (file);
 
   /* Read and verify executable header. */
   if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
@@ -593,11 +613,11 @@ fill_args_in_stack (void **esp)
 
   /* Put argv[argc]. */
   *esp -= 4;
-  memset(*esp, 0, 4);
+  memset (*esp, 0, 4);
 
   /* Put argv. */
   *esp -= argc * 4;
-  memcpy(*esp, argv, argc * 4);
+  memcpy (*esp, argv, argc * 4);
   *esp -= 4;
   *((size_t*)*esp) = (size_t)(*esp + 4);
 
@@ -625,7 +645,7 @@ setup_stack (void **esp)
       if (success)
         {
           *esp = PHYS_BASE;
-          success &= fill_args_in_stack(esp);
+          success &= fill_args_in_stack (esp);
         }
       else
         palloc_free_page (kpage);

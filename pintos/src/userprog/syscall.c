@@ -10,6 +10,8 @@
 #include "filesys/filesys.h"
 #include "devices/input.h"
 #include "devices/shutdown.h"
+#include "userprog/process.h"
+#include "threads/synch.h"
 
 #define MAX_SYSCALL_ARGUMENTS     10
 #define STRING -1
@@ -22,8 +24,14 @@ static void read_syscall (struct intr_frame *, uint32_t*, struct thread*);
 static void filesize_syscall (struct intr_frame *, uint32_t*, struct thread*);
 static void seek_syscall (struct intr_frame *, uint32_t*, struct thread*);
 static void tell_syscall (struct intr_frame *, uint32_t*, struct thread*);
+static void exit_syscall (struct intr_frame *, uint32_t*, struct thread*);
+static void open_syscall (struct intr_frame *, uint32_t*, struct thread*);
+static void close_syscall (struct intr_frame *, uint32_t*, struct thread*);
+static void create_syscall (struct intr_frame *, uint32_t*);
+static void remove_syscall (struct intr_frame *, uint32_t*);
 static void exec_syscall (struct intr_frame *, uint32_t*);
 static void wait_syscall (struct intr_frame *, uint32_t*);
+static void practice_syscall (struct intr_frame *, uint32_t*);
 
 
 
@@ -31,7 +39,7 @@ static void wait_syscall (struct intr_frame *, uint32_t*);
 void
 syscall_init (void)
 {
-
+  lock_init(&global_lock);
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
@@ -45,20 +53,20 @@ is_user_mapped_memory(const void *address)
 }
 
 static bool
-check_address (uint32_t array, int address_size)
+check_address (uint32_t addr, int address_size)
 {
   if (address_size > 0)
     {
-      if (!is_user_mapped_memory(((void *)array)) ||
-       !is_user_mapped_memory(((void *)array) + address_size - 1))
+      if (!is_user_mapped_memory(((void *)addr)) ||
+       !is_user_mapped_memory(((void *)addr) + address_size - 1))
         return false;
-    } else if (address_size < 0) {
+    }
+  else if (address_size < 0)
+    {
       int offset = 0;
-      while (is_user_mapped_memory(((void *)array) + offset) && *((char *)array + offset) != 0)
-      {
+      while (is_user_mapped_memory(((void *)addr) + offset) && *((char *)addr + offset) != 0)
         offset++;
-      }
-      if (!is_user_mapped_memory(((void *)array) + offset))
+      if (!is_user_mapped_memory(((void *)addr) + offset))
         return false;
     }
   return true;
@@ -77,38 +85,36 @@ static bool
 check_arguments(uint32_t* array, uint32_t arg_count, int32_t is_address, ...)
 {
   if (arg_count > MAX_SYSCALL_ARGUMENTS)
-  {
-    thread_current ()->cps->exit_code = -1;
-    return false;
-  }
-
-
-  if (!is_user_mapped_memory(array) || !is_user_mapped_memory((void *)(array + arg_count + 1) - 1))
-  {
-    thread_current ()->cps->exit_code = -1;
-    return false;
-  }
- 
-  if (arg_count > 0 && !check_address(array[1], is_address))
-  {
-    thread_current ()->cps->exit_code = -1;
-    return false;
-  }
-
-  va_list args;
-  va_start (args, is_address);
-  for (size_t i = 2; i <= arg_count; i ++)
-  {
-    int address_size = va_arg (args, int);
-    if (!check_address(array[i], address_size))
     {
       thread_current ()->cps->exit_code = -1;
       return false;
     }
-  }
+
+
+  if (!is_user_mapped_memory(array) || !is_user_mapped_memory((void *)(array + arg_count + 1) - 1))
+    {
+      thread_current ()->cps->exit_code = -1;
+      return false;
+    }
+ 
+  if (arg_count > 0 && !check_address(array[1], is_address))
+    {
+      thread_current ()->cps->exit_code = -1;
+      return false;
+    }
+
+  va_list args;
+  va_start (args, is_address);
+  for (size_t i = 2; i <= arg_count; i ++)
+    {
+      int address_size = va_arg (args, int);
+      if (!check_address(array[i], address_size))
+        {
+          thread_current ()->cps->exit_code = -1;
+          return false;
+        }
+    }
   va_end (args);
-
-
 
   return true;
 }
@@ -132,7 +138,7 @@ syscall_handler (struct intr_frame *f)
 {
   if (!is_kernel_vaddr(f) || !is_kernel_vaddr((void *)(f + 1) - 1))
     EXIT_WITH_ERROR;
-  
+
     
 
   uint32_t* args = ((uint32_t*) f->esp);
@@ -151,76 +157,50 @@ syscall_handler (struct intr_frame *f)
 
   switch (args[0])
     {
-    case SYS_EXIT:                  //  Terminate this process.
-      CHECK_ARGS(args, 1, VALUE);
-      f->eax = args[1];
-      trd->cps->exit_code = args[1];
-      printf ("%s: exit(%d)\n", trd->name, args[1]);
-      thread_exit ();
-      break;
-    case SYS_HALT: shutdown_power_off();                  //  Halt the operating system.
-      break;
-    case SYS_EXEC: exec_syscall(f, args);                  //  Start another process.
-      break;
-    case SYS_WAIT: wait_syscall(f, args);                  //  Wait for a child process to die.
-      break;
-    case SYS_CREATE:                 //  Create a file.
-      CHECK_ARGS (args, 2, STRING, VALUE);
-      f->eax = filesys_create ((const char *) args[1], args[2]);
-      break;
-    case SYS_REMOVE:                 //  Delete a file.
-      CHECK_ARGS (args, 1, STRING);
-      f->eax = filesys_remove ((const char *) args[1]);
-      break;
-    case SYS_OPEN:                   //  Open a file.
-      {
-        CHECK_ARGS (args, 1, STRING);
-        int fd = thread_get_free_file_descriptor (trd);
-        f->eax = fd;
-        if (fd > 0)
-          {
-            trd->file_descriptors[fd] = filesys_open ((const char *) args[1]);
-            if (trd->file_descriptors[fd] == NULL)
-            {
-              f->eax = -1;
-            }
-          }
+      case SYS_EXIT:                   //  Terminate this process.
+        exit_syscall (f, args, trd);
         break;
-      }
-    case SYS_FILESIZE:               //  Obtain a file's size. 
-      filesize_syscall (f, args, trd);
-      break;
-    case SYS_READ:                   //  Read from a file.
-      read_syscall (f, args, trd);
-      break;
-    case SYS_WRITE:                  //  Write to a file.
-      write_syscall (f, args, trd);
-      break;
-    case SYS_SEEK:                   //  Change position in a file.
-      seek_syscall (f, args, trd);
-      break; 
-    case SYS_TELL:                   //  Report current position in a file.
-      tell_syscall (f, args, trd);
-      break;
-    case SYS_CLOSE:                  //  Close a file.
-      {
-        CHECK_ARGS (args, 1, VALUE);
-        /* Fail when closing a wrong fd. */
-        if (!check_fd(trd, args[1]) || args[1] < 3)
-        {
-          trd->cps->exit_code = -1;
-          EXIT_WITH_ERROR;
-        }
-        file_close(trd->file_descriptors[args[1]]);
-        trd->file_descriptors[args[1]] = NULL;
+      case SYS_HALT:                   //  Halt the operating system.
+        shutdown_power_off ();
         break;
-      }
-    case SYS_PRACTICE:               //  Returns arg incremented by 1
-      check_arguments(args, 1, false);
-      f->eax = args[1] + 1;
-      break;
-    default:
-      break;
+      case SYS_EXEC:                   //  Start another process.
+        exec_syscall (f, args);
+        break;
+      case SYS_WAIT:                   //  Wait for a child process to die.
+        wait_syscall (f, args); 
+        break;
+      case SYS_CREATE:                 //  Create a file.
+        create_syscall (f, args);
+        break;
+      case SYS_REMOVE:                 //  Delete a file.
+        remove_syscall (f, args);
+        break;
+      case SYS_OPEN:                   //  Open a file.
+        open_syscall (f, args, trd);
+        break;
+      case SYS_FILESIZE:               //  Obtain a file's size. 
+        filesize_syscall (f, args, trd);
+        break;
+      case SYS_READ:                   //  Read from a file.
+        read_syscall (f, args, trd);
+        break;
+      case SYS_WRITE:                  //  Write to a file.
+        write_syscall (f, args, trd);
+        break;
+      case SYS_SEEK:                   //  Change position in a file.
+        seek_syscall (f, args, trd);
+        break; 
+      case SYS_TELL:                   //  Report current position in a file.
+        tell_syscall (f, args, trd);
+        break;
+      case SYS_CLOSE:                  //  Close a file.
+        close_syscall (f, args, trd);
+        break;
+      case SYS_PRACTICE:               //  Returns arg incremented by 1
+        practice_syscall (f, args);
+        break;
+      default:
+        break;
     }
 }
 
@@ -244,11 +224,81 @@ getbuf (char *buffer, size_t length)
 }
 
 static void
+exit_syscall (struct intr_frame *f, uint32_t* args, struct thread* trd)
+{
+  CHECK_ARGS (args, 1, VALUE);
+
+  f->eax = args[1];
+  trd->cps->exit_code = args[1];
+  printf ("%s: exit(%d)\n", trd->name, args[1]);
+  thread_exit ();
+}
+
+static void
+create_syscall (struct intr_frame *f, uint32_t* args)
+{
+  CHECK_ARGS (args, 2, STRING, VALUE);
+
+  lock_acquire(&global_lock);
+  f->eax = filesys_create ((const char *) args[1], args[2]);
+  lock_release(&global_lock);
+}
+
+static void
+remove_syscall (struct intr_frame *f, uint32_t* args)
+{
+  CHECK_ARGS (args, 1, STRING);
+
+  lock_acquire(&global_lock);
+  f->eax = filesys_remove ((const char *) args[1]);
+  lock_release(&global_lock);
+}
+
+static void
+practice_syscall (struct intr_frame *f, uint32_t* args)
+{
+  CHECK_ARGS (args, 1, VALUE);
+
+  f->eax = args[1] + 1;
+}
+
+static void
+open_syscall (struct intr_frame *f, uint32_t* args, struct thread* trd)
+{
+  CHECK_ARGS (args, 1, STRING);
+
+  int fd = thread_get_free_file_descriptor (trd);
+  f->eax = fd;
+  if (fd > 0)
+    {
+      lock_acquire(&global_lock);
+      trd->file_descriptors[fd] = filesys_open ((const char *) args[1]);
+      lock_release(&global_lock);
+      if (trd->file_descriptors[fd] == NULL)
+        f->eax = -1;
+    }
+}
+
+static void
+close_syscall (struct intr_frame *f, uint32_t* args, struct thread* trd)
+{
+  CHECK_ARGS (args, 1, VALUE);
+
+  /* Fail when closing a wrong fd. */
+  if (!check_fd (trd, args[1]) || args[1] < 3)
+      EXIT_WITH_ERROR;
+  lock_acquire(&global_lock);
+  file_close (trd->file_descriptors[args[1]]);
+  lock_release(&global_lock);
+  trd->file_descriptors[args[1]] = NULL;
+}
+
+static void
 exec_syscall (struct intr_frame *f, uint32_t* args)
 {
   CHECK_ARGS (args, 1, STRING);
 
-  f->eax = process_execute((const char*) args[1]);
+  f->eax = process_execute ((const char*) args[1]);
 }
 
 static void
@@ -256,7 +306,7 @@ wait_syscall (struct intr_frame *f, uint32_t* args)
 {
   CHECK_ARGS (args, 1, VALUE);
 
-  f->eax = process_wait((tid_t) args[1]);
+  f->eax = process_wait ((tid_t) args[1]);
 }
 
 static void 
@@ -265,7 +315,7 @@ read_syscall (struct intr_frame *f, uint32_t* args, struct thread* trd)
   CHECK_ARGS (args, 3, VALUE, STRING, VALUE);
 
   int fd = (int) args[1];
-  const char *buffer = (const char *) args[2];
+  char *buffer = (char *) args[2];
   int length = (int) args[3];
 
   if (!fd)
@@ -275,10 +325,12 @@ read_syscall (struct intr_frame *f, uint32_t* args, struct thread* trd)
     }
 
   /* Fail when reading a wrong fd or standard output */
-  if (!check_fd(trd, fd) || fd == 1)
+  if (!check_fd (trd, fd) || fd == 1)
       EXIT_WITH_ERROR;
 
+  lock_acquire(&global_lock);
   f->eax = file_read (trd->file_descriptors[fd], buffer, length);
+  lock_release(&global_lock);
 }
 
 static void 
@@ -295,22 +347,22 @@ write_syscall (struct intr_frame *f, uint32_t* args, struct thread* trd)
       putbuf (buffer, length);
       f->eax = length;
       return;
-
     }
 
-
   /* Fail when writing a wrong fd or standard input */
-  if (!check_fd(trd, fd) || !fd)
+  if (!check_fd (trd, fd) || !fd)
       EXIT_WITH_ERROR;
 
+  lock_acquire(&global_lock);
   f->eax = file_write (trd->file_descriptors[fd], buffer, length);
+  lock_release(&global_lock);
 }
 
 static void 
 filesize_syscall (struct intr_frame *f, uint32_t* args, struct thread* trd)
 {
 
-  CHECK_ARGS(args, 1, VALUE);
+  CHECK_ARGS (args, 1, VALUE);
 
   int fd = (int) args[1];
 
@@ -318,35 +370,41 @@ filesize_syscall (struct intr_frame *f, uint32_t* args, struct thread* trd)
   if (!check_fd(trd, fd) || fd == 0 || fd == 1)
       EXIT_WITH_ERROR;
 
+  lock_acquire(&global_lock);
   f->eax = file_length (trd->file_descriptors[fd]);
+  lock_release(&global_lock);
 }
 
 static void 
 tell_syscall (struct intr_frame *f, uint32_t* args, struct thread* trd)
 {
-  CHECK_ARGS(args, 1, VALUE);
+  CHECK_ARGS (args, 1, VALUE);
 
   int fd = args[1];
 
   /* Fail when tell of a wrong fd or standard input or standard output */
-  if (!check_fd(trd, fd) || fd == 0 || fd == 1)
+  if (!check_fd (trd, fd) || fd == 0 || fd == 1)
       EXIT_WITH_ERROR;
   
+  lock_acquire(&global_lock);
   f->eax = file_tell (trd->file_descriptors[fd]);
+  lock_release(&global_lock);
 }
 
 static void 
 seek_syscall (struct intr_frame *f, uint32_t* args, struct thread* trd)
 {
-  CHECK_ARGS(args, 2, VALUE, VALUE);
+  CHECK_ARGS (args, 2, VALUE, VALUE);
 
   int fd = args[1];
   int position = args[2];
 
   /* Fail when seek of a wrong fd or standard input or standard output */
-  if (!check_fd(trd, fd) || fd == 0 || fd == 1)
+  if (!check_fd (trd, fd) || fd == 0 || fd == 1)
       EXIT_WITH_ERROR;
   
+  lock_acquire(&global_lock);
   file_seek (trd->file_descriptors[fd], position);
+  lock_release(&global_lock);
   f->eax = 0;
 }

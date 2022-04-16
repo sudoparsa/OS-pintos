@@ -92,23 +92,24 @@ struct child_parent_status
 
     int exit_code;
 
-    bool is_finished;
-
     struct list_elem elem;
 
-    struct semaphore sema; // init to 0
+    struct semaphore sema;              /* Init with 0. */
 
-    int ref_count; // at first it is 2 showing number of threads working with this status
+    int ref_count;                      /* Init with 2,
+                                           showing number of threads working with this status. */
 
-    struct lock lock; // for locking ref_count
+    struct lock lock;                   /* For locking ref_count. */
 
   };
 
 struct fn_cps
   {
-    char *fn;
-    struct child_parent_status *cps;
-    bool success;
+    char *fn;                           /* File name. */
+
+    struct child_parent_status *cps;    /* Child parent status. */
+
+    bool success;                       /* Boolean to show load result. */
   };
 
 struct thread
