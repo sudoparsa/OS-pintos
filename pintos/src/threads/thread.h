@@ -19,15 +19,12 @@ enum thread_status
 /* Thread identifier type.
    You can redefine this to whatever type you like. */
 typedef int tid_t;
-typedef int pid_t;
 #define TID_ERROR ((tid_t) -1)          /* Error value for tid_t. */
 
 /* Thread priorities. */
 #define PRI_MIN 0                       /* Lowest priority. */
 #define PRI_DEFAULT 31                  /* Default priority. */
 #define PRI_MAX 63                      /* Highest priority. */
-
-#define MAX_FILE_DESCRIPTORS   128
 
 /* A kernel thread or user process.
 
@@ -85,33 +82,6 @@ typedef int pid_t;
    only because they are mutually exclusive: only a thread in the
    ready state is on the run queue, whereas only a thread in the
    blocked state is on a semaphore wait list. */
-
-struct child_parent_status
-  {
-    pid_t pid;
-
-    int exit_code;
-
-    struct list_elem elem;
-
-    struct semaphore sema;              /* Init with 0. */
-
-    int ref_count;                      /* Init with 2,
-                                           showing number of threads working with this status. */
-
-    struct lock lock;                   /* For locking ref_count. */
-
-  };
-
-struct fn_cps
-  {
-    char *fn;                           /* File name. */
-
-    struct child_parent_status *cps;    /* Child parent status. */
-
-    bool success;                       /* Boolean to show load result. */
-  };
-
 struct thread
   {
     /* Owned by thread.c. */
@@ -130,11 +100,6 @@ struct thread
     uint32_t *pagedir;                  /* Page directory. */
 #endif
 
-    /* Owned by userprog/syscall.c */
-    struct file* file_descriptors[MAX_FILE_DESCRIPTORS];
-    struct file* process_file;
-    struct list children;
-    struct child_parent_status *cps;
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
   };
@@ -174,7 +139,5 @@ int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
-
-int thread_get_free_file_descriptor(struct thread * t);
 
 #endif /* threads/thread.h */
