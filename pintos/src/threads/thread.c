@@ -11,6 +11,7 @@
 #include "threads/switch.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
+#include "devices/timer.h"
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
@@ -28,6 +29,8 @@ static struct list ready_list;
    when they are first scheduled and removed when they exit. */
 static struct list all_list;
 
+static struct list slept_threads;
+
 /* Idle thread. */
 static struct thread *idle_thread;
 
@@ -36,6 +39,7 @@ static struct thread *initial_thread;
 
 /* Lock used by allocate_tid(). */
 static struct lock tid_lock;
+
 
 /* Stack frame for kernel_thread(). */
 struct kernel_thread_frame
@@ -70,6 +74,8 @@ static void *alloc_frame (struct thread *, size_t size);
 static void schedule (void);
 void thread_schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
+void check_slept_threads (void);
+
 
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
@@ -85,6 +91,54 @@ static tid_t allocate_tid (void);
    It is not safe to call thread_current() until this function
    finishes. */
 void
+check_slept_threads ()
+{
+  struct list_elem* e;
+  struct thread* t;
+  enum intr_level previous_status = intr_disable ();
+
+  for (e = list_begin (&slept_threads); e != list_end (&slept_threads); e = list_next (e))
+    {
+      t = list_entry (e, struct thread, elem);
+      if (t->waking_tick <= timer_ticks ())
+       {
+          e = list_prev (e);
+          list_remove (list_next(e));
+          thread_unblock (t);
+       }
+      else
+          break;
+    }
+    intr_set_level (previous_status);
+}
+void
+thread_sleep (int64_t ticks)
+{
+  struct thread* current_thread = thread_current ();
+
+  enum intr_level previous_status = intr_disable ();
+
+  current_thread->waking_tick = timer_ticks () + ticks;
+  list_insert_ordered (&slept_threads, &current_thread->elem, compare_by_ticks, NULL);
+
+  thread_block ();
+
+  intr_set_level (previous_status);
+
+}
+
+bool
+compare_by_ticks (const struct list_elem *elem1, const struct list_elem *elem2, void *aux UNUSED)
+{
+    struct thread* t1 = list_entry (elem1, struct thread, elem);
+    struct thread* t2 = list_entry (elem2, struct thread, elem);
+    if (t1->waking_tick < t2->waking_tick)
+        return 1;
+    return 0;
+}
+
+
+void
 thread_init (void)
 {
   ASSERT (intr_get_level () == INTR_OFF);
@@ -92,6 +146,7 @@ thread_init (void)
   lock_init (&tid_lock);
   list_init (&ready_list);
   list_init (&all_list);
+  list_init (&slept_threads);
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
@@ -137,6 +192,8 @@ thread_tick (void)
   /* Enforce preemption. */
   if (++thread_ticks >= TIME_SLICE)
     intr_yield_on_return ();
+  if (!list_empty(&slept_threads))
+    check_slept_threads ();
 }
 
 /* Prints thread statistics. */

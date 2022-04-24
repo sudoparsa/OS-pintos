@@ -94,6 +94,7 @@ struct thread
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
+    int64_t waking_tick;
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
@@ -139,5 +140,6 @@ int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
-
+void thread_sleep(int64_t ticks);
+bool compare_by_ticks (const struct list_elem *elem1, const struct list_elem *elem2, void *aux UNUSED);
 #endif /* threads/thread.h */
