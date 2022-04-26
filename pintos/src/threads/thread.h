@@ -26,6 +26,12 @@ typedef int tid_t;
 #define PRI_DEFAULT 31                  /* Default priority. */
 #define PRI_MAX 63                      /* Highest priority. */
 
+/* Base value for lock's priority. */
+# define BASE_PRIORITY -1
+
+/* Maximum depth for donation. */
+# define NESTED_DONATION_DEPTH 10
+
 /* A kernel thread or user process.
 
    Each thread structure is stored in its own 4 kB page.  The
@@ -89,12 +95,23 @@ struct thread
     enum thread_status status;          /* Thread state. */
     char name[16];                      /* Name (for debugging purposes). */
     uint8_t *stack;                     /* Saved stack pointer. */
-    int priority;                       /* Priority. */
+    int priority;                       /* Thread's effective priority after donation. */
     struct list_elem allelem;           /* List element for all threads list. */
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
     int64_t waking_tick;
+
+    int base_priority;                  /* Thread's original priority. */
+
+    struct list held_locks;             /* All locks a thread holds, ordered by the highest thread priority. 
+                                         * Used to set thread's effective priority. 
+                                         */
+   
+    struct lock *wait_lock;             /* Keeps track of the lock that has been blocking the thread, if there is any.
+                                         * Used in recursive donations. 
+                                         */
+    bool donated;
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
@@ -142,4 +159,6 @@ int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 void thread_sleep(int64_t ticks);
 bool compare_by_ticks (const struct list_elem *elem1, const struct list_elem *elem2, void *aux UNUSED);
+bool compare_by_priority (const struct list_elem *elem1, const struct list_elem *elem2, void *aux UNUSED);
+void update_ready_list (struct thread *);
 #endif /* threads/thread.h */
