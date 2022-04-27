@@ -414,11 +414,17 @@ void
 thread_set_priority (int new_priority)
 {
   ASSERT (PRI_MIN <= new_priority && new_priority <= PRI_MAX);
-
-  thread_current ()->priority = new_priority;
-  thread_current ()->base_priority = new_priority;
+  enum intr_level old_level = intr_disable ();
+  struct thread* cur = thread_current ();
+  if (cur->donated && new_priority <= cur->priority)
+    cur->base_priority = new_priority;
+  else
+    cur->priority = cur->base_priority = new_priority;
+  // thread_current ()->priority = new_priority;
+  // thread_current ()->base_priority = new_priority;
 
   thread_yield ();
+  intr_set_level (old_level);
 }
 
 /* Returns the current thread's priority. */
@@ -668,3 +674,5 @@ allocate_tid (void)
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
+
+    

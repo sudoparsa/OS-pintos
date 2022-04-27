@@ -43,6 +43,7 @@
      thread, if any). */
 
 void recursive_inversion (struct thread*, int);
+bool compare_by_lock_priority(const struct list_elem *elem1, const struct list_elem *elem2, void *aux UNUSED);
 
 void
 sema_init (struct semaphore *sema, unsigned value)
@@ -71,7 +72,6 @@ sema_down (struct semaphore *sema)
   old_level = intr_disable ();
   while (sema->value == 0)
     {
-      // list_insert_ordered (&sema->waiters, &thread_current ()->elem, compare_by_priority, NULL);
       list_push_back (&sema->waiters, &thread_current ()->elem);
       thread_block ();
     }
@@ -117,9 +117,10 @@ sema_up (struct semaphore *sema)
   ASSERT (sema != NULL);
 
   old_level = intr_disable ();
-  if (!list_empty (&sema->waiters))
+  while (!list_empty (&sema->waiters)){
     thread_unblock (list_entry (list_pop_front (&sema->waiters),
                                 struct thread, elem));
+  }
   sema->value++;
   intr_set_level (old_level);
 }
@@ -183,7 +184,7 @@ lock_init (struct lock *lock)
 
   lock->holder = NULL;
   sema_init (&lock->semaphore, 1);
-  lock->priority = -1;
+  lock->priority = BASE_PRIORITY;
 }
 
 void recursive_inversion (struct thread* t, int depth)
@@ -197,7 +198,8 @@ void recursive_inversion (struct thread* t, int depth)
       t->wait_lock->holder->priority = t->priority; // Donation
       t->wait_lock->holder->donated = true;
       update_ready_list (t->wait_lock->holder);
-      recursive_inversion (t->wait_lock->holder, depth - 1);
+      if (t->wait_lock->holder->wait_lock)
+        recursive_inversion (t->wait_lock->holder, depth - 1);
     }
   return;
 }
@@ -227,10 +229,8 @@ lock_acquire (struct lock *lock)
 
   lock->holder = thread_current ();
   lock->holder->wait_lock = NULL;
-  list_insert_ordered (&lock->holder->held_locks, &lock->elem, compare_by_priority, NULL);
-
+  list_insert_ordered (&lock->holder->held_locks, &lock->elem, compare_by_lock_priority, NULL);
   intr_set_level (previous_status);
-  
 }
 
 /* Tries to acquires LOCK and returns true if successful or false
@@ -277,15 +277,21 @@ lock_release (struct lock *lock)
   if (!list_empty (&cur->held_locks))
     {
       struct lock *first = list_entry (list_front (&cur->held_locks), struct lock, elem);
-      if (first->priority != BASE_PRIORITY)
+      if (first->priority != BASE_PRIORITY){
         cur_priority = first->priority;
+        cur->priority = cur_priority;
+        cur->donated = true;
+        update_ready_list (cur);
+        thread_yield ();
+        intr_set_level (prev_status);
+        return;
+      }
     }
   else
       cur->donated = false;
+  
+  thread_set_priority(cur_priority);
 
-  cur->priority = cur_priority;
-
-  thread_yield ();
   intr_set_level (prev_status);
 }
 
@@ -389,4 +395,12 @@ cond_broadcast (struct condition *cond, struct lock *lock)
 
   while (!list_empty (&cond->waiters))
     cond_signal (cond, lock);
+}
+
+bool compare_by_lock_priority(const struct list_elem *elem1, const struct list_elem *elem2, void *aux UNUSED)
+{
+  const struct lock *lock1 = list_entry (elem1, struct lock, elem);
+  const struct lock *lock2 = list_entry (elem2, struct lock, elem);
+
+  return lock1->priority >= lock2->priority;
 }

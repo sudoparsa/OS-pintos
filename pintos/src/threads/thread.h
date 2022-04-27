@@ -30,7 +30,7 @@ typedef int tid_t;
 # define BASE_PRIORITY -1
 
 /* Maximum depth for donation. */
-# define NESTED_DONATION_DEPTH 10
+# define NESTED_DONATION_DEPTH 8
 
 /* A kernel thread or user process.
 
