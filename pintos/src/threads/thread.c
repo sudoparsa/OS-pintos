@@ -115,10 +115,8 @@ check_slept_threads ()
 void
 thread_sleep (int64_t ticks)
 {
-  struct thread* current_thread = thread_current ();
-
   enum intr_level previous_status = intr_disable ();
-
+  struct thread* current_thread = thread_current ();
   current_thread->waking_tick = timer_ticks () + ticks;
   list_insert_ordered (&slept_threads, &current_thread->elem, compare_by_ticks, NULL);
 
@@ -383,7 +381,6 @@ thread_yield (void)
   enum intr_level old_level;
 
   ASSERT (!intr_context ());
-
   old_level = intr_disable ();
   if (cur != idle_thread)
     list_insert_ordered (&ready_list, &cur->elem, compare_by_priority, NULL);
@@ -418,11 +415,11 @@ thread_set_priority (int new_priority)
   struct thread* cur = thread_current ();
   if (cur->donated && new_priority <= cur->priority)
     cur->base_priority = new_priority;
-  else
+  else{
     cur->priority = cur->base_priority = new_priority;
   // thread_current ()->priority = new_priority;
   // thread_current ()->base_priority = new_priority;
-
+  }
   thread_yield ();
   intr_set_level (old_level);
 }

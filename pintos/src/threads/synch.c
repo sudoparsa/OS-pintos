@@ -44,7 +44,7 @@
 
 void recursive_inversion (struct thread*, int);
 bool compare_by_lock_priority(const struct list_elem *elem1, const struct list_elem *elem2, void *aux UNUSED);
-
+bool compare_by_cond_priority(const struct list_elem *elem1, const struct list_elem *elem2, void *aux UNUSED);
 void
 sema_init (struct semaphore *sema, unsigned value)
 {
@@ -112,17 +112,25 @@ sema_try_down (struct semaphore *sema)
 void
 sema_up (struct semaphore *sema)
 {
-  enum intr_level old_level;
-
   ASSERT (sema != NULL);
 
-  old_level = intr_disable ();
-  while (!list_empty (&sema->waiters)){
-    thread_unblock (list_entry (list_pop_front (&sema->waiters),
-                                struct thread, elem));
+  enum intr_level previous_status = intr_disable ();
+  struct thread* t = NULL;
+  bool flag = false;
+  if (!list_empty (&sema->waiters)){
+    list_sort (&sema->waiters, compare_by_priority, NULL);
+    t = list_entry (list_pop_front (&sema->waiters), struct thread, elem);
+    thread_unblock (t);
   }
+  // else
+  //   flag = true;
+    
   sema->value++;
-  intr_set_level (old_level);
+  // if (max_thread  && cur->priority < max_thread->priority){
+  // if (!flag)
+  //  thread_yield ();
+  // }
+  intr_set_level (previous_status);
 }
 
 static void sema_test_helper (void *sema_);
@@ -311,6 +319,7 @@ struct semaphore_elem
   {
     struct list_elem elem;              /* List element. */
     struct semaphore semaphore;         /* This semaphore. */
+    int priority;
   };
 
 /* Initializes condition variable COND.  A condition variable
@@ -353,9 +362,9 @@ cond_wait (struct condition *cond, struct lock *lock)
   ASSERT (lock != NULL);
   ASSERT (!intr_context ());
   ASSERT (lock_held_by_current_thread (lock));
-
+  waiter.priority = thread_current ()-> priority;
   sema_init (&waiter.semaphore, 0);
-  list_push_back (&cond->waiters, &waiter.elem);
+  list_insert_ordered (&cond->waiters, &waiter.elem, compare_by_cond_priority, NULL);
   lock_release (lock);
   sema_down (&waiter.semaphore);
   lock_acquire (lock);
@@ -402,5 +411,13 @@ bool compare_by_lock_priority(const struct list_elem *elem1, const struct list_e
   const struct lock *lock1 = list_entry (elem1, struct lock, elem);
   const struct lock *lock2 = list_entry (elem2, struct lock, elem);
 
-  return lock1->priority >= lock2->priority;
+  return lock1->priority > lock2->priority;
+}
+
+bool compare_by_cond_priority(const struct list_elem *elem1, const struct list_elem *elem2, void *aux UNUSED)
+{
+  const struct semaphore_elem *s1 = list_entry (elem1, struct semaphore_elem, elem);
+  const struct semaphore_elem *s2 = list_entry (elem2, struct semaphore_elem, elem);
+
+  return s1->priority > s2->priority;
 }
