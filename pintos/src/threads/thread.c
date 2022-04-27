@@ -111,6 +111,7 @@ check_slept_threads ()
           break;
     }
     intr_set_level (previous_status);
+
 }
 void
 thread_sleep (int64_t ticks)
@@ -211,6 +212,7 @@ thread_tick (void)
     intr_yield_on_return ();
   if (!list_empty(&slept_threads))
     check_slept_threads ();
+
 }
 
 /* Prints thread statistics. */
@@ -417,10 +419,12 @@ thread_set_priority (int new_priority)
     cur->base_priority = new_priority;
   else{
     cur->priority = cur->base_priority = new_priority;
+  
   // thread_current ()->priority = new_priority;
   // thread_current ()->base_priority = new_priority;
   }
   thread_yield ();
+
   intr_set_level (old_level);
 }
 
