@@ -27,7 +27,7 @@ struct lock
      * or has been blocked by this lock.
      * Initialized value is BASE_PRIORITY.
      */
-    int priority;
+    int priority;               /* Lock holder priority. */
 
     struct list_elem elem;      /* Elem for held locks list. */
   };

@@ -75,7 +75,7 @@ static void schedule (void);
 void thread_schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
 void check_slept_threads (void);
-void update_ready_list (struct thread *);
+void thread_update_readylist (struct thread *);
 
 
 /* Initializes the threading system by transforming the code
@@ -96,7 +96,7 @@ check_slept_threads ()
 {
   struct list_elem* e;
   struct thread* t;
-  enum intr_level previous_status = intr_disable ();
+  enum intr_level old_level = intr_disable ();
 
   for (e = list_begin (&slept_threads); e != list_end (&slept_threads); e = list_next (e))
     {
@@ -110,35 +110,33 @@ check_slept_threads ()
       else
           break;
     }
-    intr_set_level (previous_status);
+  intr_set_level (old_level);
 
 }
 void
 thread_sleep (int64_t ticks)
 {
-  enum intr_level previous_status = intr_disable ();
+  enum intr_level old_level = intr_disable ();
   struct thread* current_thread = thread_current ();
   current_thread->waking_tick = timer_ticks () + ticks;
-  list_insert_ordered (&slept_threads, &current_thread->elem, compare_by_ticks, NULL);
+  list_insert_ordered (&slept_threads, &current_thread->elem, thread_compareby_ticks, NULL);
 
   thread_block ();
 
-  intr_set_level (previous_status);
+  intr_set_level (old_level);
 
 }
 
 bool
-compare_by_ticks (const struct list_elem *elem1, const struct list_elem *elem2, void *aux UNUSED)
+thread_compareby_ticks (const struct list_elem *elem1, const struct list_elem *elem2, void *aux UNUSED)
 {
     struct thread* t1 = list_entry (elem1, struct thread, elem);
     struct thread* t2 = list_entry (elem2, struct thread, elem);
-    if (t1->waking_tick < t2->waking_tick)
-        return 1;
-    return 0;
+    return t1->waking_tick < t2->waking_tick;
 }
 
 bool
-compare_by_priority (const struct list_elem *elem1, const struct list_elem *elem2, void *aux UNUSED)
+thread_compareby_priority (const struct list_elem *elem1, const struct list_elem *elem2, void *aux UNUSED)
 {
     struct thread* t1 = list_entry (elem1, struct thread, elem);
     struct thread* t2 = list_entry (elem2, struct thread, elem);
@@ -146,12 +144,12 @@ compare_by_priority (const struct list_elem *elem1, const struct list_elem *elem
 }
 
 void
-update_ready_list (struct thread* t)
+thread_update_readylist (struct thread* t)
 {
   if (t->status == THREAD_READY)
    {
      list_remove (&t->elem);
-     list_insert_ordered (&ready_list, &t->elem, compare_by_priority, NULL);
+     list_insert_ordered (&ready_list, &t->elem, thread_compareby_priority, NULL);
    } 
 }
 
@@ -315,7 +313,7 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
-  list_insert_ordered (&ready_list, &t->elem, compare_by_priority, NULL);
+  list_insert_ordered (&ready_list, &t->elem, thread_compareby_priority, NULL);
   t->status = THREAD_READY;
   intr_set_level (old_level);
 }
@@ -385,7 +383,7 @@ thread_yield (void)
   ASSERT (!intr_context ());
   old_level = intr_disable ();
   if (cur != idle_thread)
-    list_insert_ordered (&ready_list, &cur->elem, compare_by_priority, NULL);
+    list_insert_ordered (&ready_list, &cur->elem, thread_compareby_priority, NULL);
   cur->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);
@@ -415,14 +413,12 @@ thread_set_priority (int new_priority)
   ASSERT (PRI_MIN <= new_priority && new_priority <= PRI_MAX);
   enum intr_level old_level = intr_disable ();
   struct thread* cur = thread_current ();
+
   if (cur->donated && new_priority <= cur->priority)
     cur->base_priority = new_priority;
-  else{
+  else
     cur->priority = cur->base_priority = new_priority;
-  
-  // thread_current ()->priority = new_priority;
-  // thread_current ()->base_priority = new_priority;
-  }
+
   thread_yield ();
 
   intr_set_level (old_level);

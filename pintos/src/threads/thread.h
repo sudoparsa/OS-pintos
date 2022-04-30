@@ -100,7 +100,8 @@ struct thread
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
-    int64_t waking_tick;
+
+    int64_t waking_tick;                /* Tick in which thread should be woken up. */
 
     int base_priority;                  /* Thread's original priority. */
 
@@ -111,7 +112,7 @@ struct thread
     struct lock *wait_lock;             /* Keeps track of the lock that has been blocking the thread, if there is any.
                                          * Used in recursive donations. 
                                          */
-    bool donated;
+    bool donated;                       /* Thread donation status */
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
@@ -158,7 +159,7 @@ void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 void thread_sleep(int64_t ticks);
-bool compare_by_ticks (const struct list_elem *elem1, const struct list_elem *elem2, void *aux UNUSED);
-bool compare_by_priority (const struct list_elem *elem1, const struct list_elem *elem2, void *aux UNUSED);
-void update_ready_list (struct thread *);
+bool thread_compareby_ticks (const struct list_elem *elem1, const struct list_elem *elem2, void *aux UNUSED);
+bool thread_compareby_priority (const struct list_elem *elem1, const struct list_elem *elem2, void *aux UNUSED);
+void thread_update_readylist (struct thread *);
 #endif /* threads/thread.h */
