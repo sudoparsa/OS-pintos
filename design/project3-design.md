@@ -39,7 +39,17 @@ struct chache_block
     struct list_elem chache_elem;
     struct lock chache_lock;
 
+    // for second chance algorithm
+    bool chance;
 }
+// for LRU
+struct list cache;
+
+
+// for second chance algorithm
+cache_blcok cache[64];
+
+struct lock cache_list_lock;
 ```
 
 
@@ -91,6 +101,8 @@ struct chache_block
 با همان 
 `lock`
 که در سوال قبل توضیح داده شد.
+اگر بخواهیم لیست را تغییر دهیم باید از لاکی که برای لیست گرفتیم نیز استفاده کنیم ولی اگر
+از همان آرایه و الگوریتم شانس مجدد استفاده کنیم نیازی به لاک برای آرایه نخواهد بود.
 
 منطق طراحی
 -----------------
