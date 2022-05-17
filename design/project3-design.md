@@ -141,7 +141,7 @@ struct inode_disk
     block_sector_t direct[123];         /* Direct blocks of inode. */
     block_sector_t indirect;            /* Indirect blocks of inode. */
     block_sector_t double_indirect;     /* Double indirect blocks of indoe. */
-    /* `unused` is removed as it's being used. :D
+    /* `unused` is removed as it's being used. :D */
   };
 
 struct inode
