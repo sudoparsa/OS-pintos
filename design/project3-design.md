@@ -141,15 +141,20 @@ struct inode_disk
     block_sector_t direct[123];         /* Direct blocks of inode. */
     block_sector_t indirect;            /* Indirect blocks of inode. */
     block_sector_t double_indirect;     /* Double indirect blocks of indoe. */
+    /* `unused` is removed as it's being used. :D
   };
 
 struct inode
   {
     ...
-    struct lock f_lock;
+    struct lock f_lock;                 /* Synchronization between users of inode. */
   };
+
+/* This signature has to change to comply with new file system. */
+bool inode_create (/*block_sector_t sector*/ struct inode_disk * inode, off_t length);
 ```
 
+توجه کنید که struct file آدرس inode را نگاه می‌دارد و به این ترتیب نیاز به تغییر ساختار برای پیاده‌سازی `inumber` وجود ندارد و تنها نیاز به پیاده‌سازی جزییات است.
 
 >>‫ بیشترین سایز فایل پشتیبانی شده توسط ساختار inode شما چقدر است؟
 
