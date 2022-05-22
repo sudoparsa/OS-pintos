@@ -11,14 +11,23 @@
 /* Identifies an inode. */
 #define INODE_MAGIC 0x494e4f44
 
+#define DIRECT_BLOCK_NO 123
+#define INDIRECT_BLOCK_NO BLOCK_SECTOR_SIZE/4
+
 /* On-disk inode.
    Must be exactly BLOCK_SECTOR_SIZE bytes long. */
 struct inode_disk
   {
-    block_sector_t start;               /* First data sector. */
+    /* `start` is removed as file blocks are saved in the added variables now. */ 
     off_t length;                       /* File size in bytes. */
     unsigned magic;                     /* Magic number. */
-    uint32_t unused[125];               /* Not used. */
+
+    bool is_dir;                        /* Refer to task 3. */
+
+    block_sector_t direct[DIRECT_BLOCK_NO];         /* Direct blocks of inode. */
+    block_sector_t indirect;            /* Indirect blocks of inode. */
+    block_sector_t double_indirect;     /* Double indirect blocks of indoe. */
+    /* `unused` is removed as it's being used. :D */
   };
 
 /* Returns the number of sectors to allocate for an inode SIZE
@@ -37,8 +46,16 @@ struct inode
     int open_cnt;                       /* Number of openers. */
     bool removed;                       /* True if deleted, false otherwise. */
     int deny_write_cnt;                 /* 0: writes ok, >0: deny writes. */
-    struct inode_disk data;             /* Inode content. */
+    struct lock f_lock;                 /* Synchronization between users of inode. */
   };
+
+struct inode_disk *
+get_inode_disk (const struct inode *inode)
+{
+  struct inode_disk *id = malloc (sizeof (struct inode_disk*));
+  cache_read(fs_device, inode->sector, (void *)id, 0, BLOCK_SECTOR_SIZE);
+  return id;
+}
 
 /* Returns the block device sector that contains byte offset POS
    within INODE.
@@ -48,10 +65,33 @@ static block_sector_t
 byte_to_sector (const struct inode *inode, off_t pos)
 {
   ASSERT (inode != NULL);
-  if (pos < inode->data.length)
-    return inode->data.start + pos / BLOCK_SECTOR_SIZE;
+
+  struct inode_disk *id = get_inode_disk(inode);
+
+  if (pos >= id->length)
+      return -1;
+  
+  off_t block_idx = pos / BLOCK_SECTOR_SIZE;
+  if (pos < DIRECT_BLOCK_NO * BLOCK_SECTOR_SIZE)
+      return id->direct[block_idx];
+  
+  else if (pos < (DIRECT_BLOCK_NO + INDIRECT_BLOCK_NO) * BLOCK_SECTOR_SIZE)
+    {
+      block_sector_t indirect_blocks[INDIRECT_BLOCK_NO];
+      cache_read(fs_device, id->indirect, &indirect_blocks, 0, BLOCK_SECTOR_SIZE);
+      block_idx = block_idx - DIRECT_BLOCK_NO;
+      return indirect_blocks[block_idx];
+    }
   else
-    return -1;
+    {
+      block_sector_t double_indirect_blocks[INDIRECT_BLOCK_NO];
+      cache_read(fs_device, id->double_indirect, &double_indirect_blocks, 0, BLOCK_SECTOR_SIZE);
+      off_t indirect_block_idx = (block_idx - DIRECT_BLOCK_NO - INDIRECT_BLOCK_NO) / INDIRECT_BLOCK_NO;
+      block_idx = (block_idx - DIRECT_BLOCK_NO - INDIRECT_BLOCK_NO) % INDIRECT_BLOCK_NO;
+      block_sector_t blocks[INDIRECT_BLOCK_NO];
+      cache_read(fs_device, double_indirect_blocks[indirect_block_idx], &blocks, 0, BLOCK_SECTOR_SIZE);
+      return blocks[block_idx];
+    }
 }
 
 /* List of open inodes, so that opening a single inode twice
