@@ -58,6 +58,7 @@ get_cache_block (struct block *fs_device, block_sector_t sector)
       block_read (fs_device, sector, LRU_block->data);
       LRU_block->valid = true;
       LRU_block->dirty = false;
+      LRU_block->sector_num = sector;
       list_push_back (&cache_LRU, &LRU_block->cache_elem);
 
       lock_release (&LRU_block->cache_lock);
