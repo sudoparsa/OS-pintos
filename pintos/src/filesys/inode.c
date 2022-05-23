@@ -13,6 +13,12 @@
 
 #define DIRECT_BLOCK_NO 123
 #define INDIRECT_BLOCK_NO BLOCK_SECTOR_SIZE/4
+#define UNALLOCATED 0
+
+
+struct inode_disk *get_inode_disk (const struct inode *);
+bool inode_disk_allocate (struct inode_disk *disk_inode, off_t length);
+bool allocate_sector (block_sector_t *sector_idx);
 
 /* On-disk inode.
    Must be exactly BLOCK_SECTOR_SIZE bytes long. */
@@ -78,18 +84,18 @@ byte_to_sector (const struct inode *inode, off_t pos)
   else if (pos < (DIRECT_BLOCK_NO + INDIRECT_BLOCK_NO) * BLOCK_SECTOR_SIZE)
     {
       block_sector_t indirect_blocks[INDIRECT_BLOCK_NO];
-      cache_read(fs_device, id->indirect, &indirect_blocks, 0, BLOCK_SECTOR_SIZE);
+      cache_read (fs_device, id->indirect, &indirect_blocks, 0, BLOCK_SECTOR_SIZE);
       block_idx = block_idx - DIRECT_BLOCK_NO;
       return indirect_blocks[block_idx];
     }
   else
     {
       block_sector_t double_indirect_blocks[INDIRECT_BLOCK_NO];
-      cache_read(fs_device, id->double_indirect, &double_indirect_blocks, 0, BLOCK_SECTOR_SIZE);
+      cache_read (fs_device, id->double_indirect, &double_indirect_blocks, 0, BLOCK_SECTOR_SIZE);
       off_t indirect_block_idx = (block_idx - DIRECT_BLOCK_NO - INDIRECT_BLOCK_NO) / INDIRECT_BLOCK_NO;
       block_idx = (block_idx - DIRECT_BLOCK_NO - INDIRECT_BLOCK_NO) % INDIRECT_BLOCK_NO;
       block_sector_t blocks[INDIRECT_BLOCK_NO];
-      cache_read(fs_device, double_indirect_blocks[indirect_block_idx], &blocks, 0, BLOCK_SECTOR_SIZE);
+      cache_read (fs_device, double_indirect_blocks[indirect_block_idx], &blocks, 0, BLOCK_SECTOR_SIZE);
       return blocks[block_idx];
     }
 }
@@ -125,27 +131,92 @@ inode_create (block_sector_t sector, off_t length)
   disk_inode = calloc (1, sizeof *disk_inode);
   if (disk_inode != NULL)
     {
-      size_t sectors = bytes_to_sectors (length);
+      // TODO: Add is_dir bool
+      // disk_inode->is_dir = is_dir;
       disk_inode->length = length;
       disk_inode->magic = INODE_MAGIC;
-      if (free_map_allocate (sectors, &disk_inode->start))
+      if (inode_disk_allocate (disk_inode, length))
         {
           cache_write (fs_device, sector, disk_inode, 0, BLOCK_SECTOR_SIZE);
-          //block_write (fs_device, sector, disk_inode);
-          if (sectors > 0)
-            {
-              static char zeros[BLOCK_SECTOR_SIZE];
-              size_t i;
+          // block_write (fs_device, sector, disk_inode);
+          // if (sectors > 0)
+          //   {
+          //     static char zeros[BLOCK_SECTOR_SIZE];
+          //     size_t i;
 
-              for (i = 0; i < sectors; i++)
-                //block_write (fs_device, disk_inode->start + i, zeros);
-                cache_write (fs_device, disk_inode->start + i, zeros, 0, BLOCK_SECTOR_SIZE);
-            }
+          //     for (i = 0; i < sectors; i++)
+          //       //block_write (fs_device, disk_inode->start + i, zeros);
+          //       cache_write (fs_device, disk_inode->start + i, zeros, 0, BLOCK_SECTOR_SIZE);
+          //   }
           success = true;
         }
       free (disk_inode);
     }
   return success;
+}
+
+bool
+inode_disk_allocate (struct inode_disk *disk_inode, off_t length)
+{
+  size_t num_sectors_to_allocate = bytes_to_sectors (length);
+  size_t i;
+  for (i = 0; i < num_sectors_to_allocate && i < DIRECT_BLOCK_NO; i++)
+    if (disk_inode->direct[i] == UNALLOCATED)
+      if (!allocate_sector (&disk_inode->direct[i]))
+        return false;
+  num_sectors_to_allocate -= i;
+  if (num_sectors_to_allocate == 0)
+    return true;
+  
+  if (disk_inode->indirect == UNALLOCATED && !allocate_sector (&disk_inode->indirect))
+    return false;
+
+  block_sector_t indirect_blocks[INDIRECT_BLOCK_NO];
+  cache_read (fs_device, disk_inode->indirect, &indirect_blocks, 0, BLOCK_SECTOR_SIZE);
+  for (i = 0; i < num_sectors_to_allocate && i < INDIRECT_BLOCK_NO; i++)
+    if (indirect_blocks[i] == UNALLOCATED)
+      if (!allocate_sector (&indirect_blocks[i]))
+        return false;
+  cache_write (fs_device, disk_inode->indirect, &indirect_blocks, 0, BLOCK_SECTOR_SIZE);
+  num_sectors_to_allocate -= i;
+  if (num_sectors_to_allocate == 0)
+    return true;
+  
+  if (disk_inode->double_indirect == UNALLOCATED && !allocate_sector (&disk_inode->double_indirect))
+    return false;
+  
+  block_sector_t blocks[INDIRECT_BLOCK_NO];
+  cache_read (fs_device, disk_inode->double_indirect, &blocks, 0, BLOCK_SECTOR_SIZE);
+
+  if (num_sectors_to_allocate >= INDIRECT_BLOCK_NO * INDIRECT_BLOCK_NO)
+    return false;
+  
+  size_t no_blocks = DIV_ROUND_UP (num_sectors_to_allocate, INDIRECT_BLOCK_NO);
+  for (i = 0; i < no_blocks; i++)
+    {
+      block_sector_t double_indirect_blocks[INDIRECT_BLOCK_NO];
+      cache_read (fs_device, blocks[i], &double_indirect_blocks, 0, BLOCK_SECTOR_SIZE);
+      size_t j;
+      for (j = 0; j < num_sectors_to_allocate && j < INDIRECT_BLOCK_NO; j++)
+        if (double_indirect_blocks[j] == UNALLOCATED)
+          if (!allocate_sector (&double_indirect_blocks[j]))
+            return false;
+      cache_write (fs_device, blocks[i], &double_indirect_blocks, 0, BLOCK_SECTOR_SIZE);
+      num_sectors_to_allocate -= j;
+    }
+  return true;
+}
+
+bool
+allocate_sector (block_sector_t *sector_idx)
+{
+  static char zeros[BLOCK_SECTOR_SIZE];
+  if (free_map_allocate(1, sector_idx))
+    {
+      cache_write (fs_device, *sector_idx, zeros, 0, BLOCK_SECTOR_SIZE);
+      return true;
+    }
+  return false;
 }
 
 /* Reads an inode from SECTOR
@@ -180,8 +251,9 @@ inode_open (block_sector_t sector)
   inode->open_cnt = 1;
   inode->deny_write_cnt = 0;
   inode->removed = false;
+  lock_init (&inode->f_lock);
   //block_read (fs_device, inode->sector, &inode->data);
-  cache_read(fs_device, inode->sector, &inode->data, 0 , BLOCK_SECTOR_SIZE);
+  cache_read (fs_device, inode->sector, &inode->data, 0 , BLOCK_SECTOR_SIZE);
   return inode;
 }
 
