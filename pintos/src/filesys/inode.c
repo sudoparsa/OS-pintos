@@ -144,7 +144,7 @@ inode_create (block_sector_t sector, off_t length)
   if (disk_inode != NULL)
     {
       // TODO: Add is_dir bool
-      // disk_inode->is_dir = is_dir;
+      disk_inode->is_dir = false;
       disk_inode->length = length;
       disk_inode->magic = INODE_MAGIC;
       if (inode_disk_allocate (disk_inode, length))
@@ -232,10 +232,10 @@ allocate_indirect(block_sector_t *sector_idx, size_t num_sectors_to_allocate)
 static bool
 allocate_sector (block_sector_t *sector_idx)
 {
-  static char buffer[BLOCK_SECTOR_SIZE];
+  static char zeros[BLOCK_SECTOR_SIZE];
   if (free_map_allocate(1, sector_idx))
     {
-      cache_write (fs_device, *sector_idx, buffer, 0, BLOCK_SECTOR_SIZE);
+      cache_write (fs_device, *sector_idx, zeros, 0, BLOCK_SECTOR_SIZE);
       return true;
     }
   return false;
