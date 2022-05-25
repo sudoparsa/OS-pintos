@@ -29,7 +29,7 @@ struct inode_disk
     off_t length;                       /* File size in bytes. */
     unsigned magic;                     /* Magic number. */
 
-    bool is_dir;                        /* Refer to task 3. */
+    bool is_dir;                        /* True if the file is a directory. */
 
     block_sector_t direct[DIRECT_BLOCK_NO];         /* Direct blocks of inode. */
     block_sector_t indirect;            /* Indirect blocks of inode. */
@@ -129,7 +129,7 @@ inode_init (void)
    Returns true if successful.
    Returns false if memory or disk allocation fails. */
 bool
-inode_create (block_sector_t sector, off_t length)
+inode_create (block_sector_t sector, off_t length, bool is_dir)
 {
   struct inode_disk *disk_inode = NULL;
   bool success = false;
@@ -143,8 +143,7 @@ inode_create (block_sector_t sector, off_t length)
   disk_inode = calloc (1, sizeof *disk_inode);
   if (disk_inode != NULL)
     {
-      // TODO: Add is_dir bool
-      disk_inode->is_dir = false;
+      disk_inode->is_dir = is_dir;
       disk_inode->length = length;
       disk_inode->magic = INODE_MAGIC;
       if (inode_disk_allocate (disk_inode, length))
@@ -291,6 +290,13 @@ block_sector_t
 inode_get_inumber (const struct inode *inode)
 {
   return inode->sector;
+}
+
+/* Returns INODE's remove status. */
+bool
+inode_get_removed (const struct inode *inode)
+{
+  return inode->removed;
 }
 
 /* Closes INODE and writes it to disk.
