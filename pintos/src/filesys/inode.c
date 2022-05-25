@@ -299,6 +299,14 @@ inode_get_removed (const struct inode *inode)
   return inode->removed;
 }
 
+/* Returns INODE DISK's is_dir. */
+bool
+inode_disk_isdir (const struct inode_disk *disk_inode)
+{
+  return disk_inode->is_dir;
+}
+
+
 /* Closes INODE and writes it to disk.
    If this was the last reference to INODE, frees its memory.
    If INODE was also a removed inode, frees its blocks. */

@@ -109,6 +109,20 @@ get_new_entry (block_sector_t sector, const char *name)
   return e;
 }
 
+static bool
+check_directory (struct dir *dir)
+{
+  struct dir_entry e;
+  off_t ofs;
+
+  for (ofs = 2 * sizeof e; inode_read_at (dir->inode, &e, sizeof e, ofs) == sizeof e;
+       ofs += sizeof e)
+      if (e.in_use)
+        return false;
+  return true;
+}
+
+
 /* Creates a directory with space for ENTRY_CNT entries in the
    given SECTOR.  Returns true if successful, false on failure. */
 bool
@@ -327,6 +341,15 @@ dir_remove (struct dir *dir, const char *name)
   inode = inode_open (e.inode_sector);
   if (inode == NULL)
     goto done;
+
+  if (inode_disk_isdir (get_inode_disk (inode))) 
+    {
+      struct dir *t_dir = dir_open (inode);
+      bool empty = check_directory (t_dir);
+      dir_close (t_dir);
+      if (!empty)
+        goto done;
+    }
 
   /* Erase directory entry. */
   e.in_use = false;
