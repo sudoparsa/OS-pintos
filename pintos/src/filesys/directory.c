@@ -72,13 +72,17 @@ dir_openby_path (const char *path)
 
   int flag = 1;
   
-  while (flag == 1)
+  while (true)
     {
       char part[NAME_MAX + 1];
       flag = get_next_part (part, (const char**)&t_path);
-      /* if name was invalid, return failure */
+      /* if name is invalid, return failure. */
       if (flag == -1)
         goto failed;
+      
+      /* end of path */
+      if (flag == 0)
+        break;
 
       struct inode *next_inode;
       /* path validation */
