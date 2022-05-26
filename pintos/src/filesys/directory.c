@@ -76,26 +76,31 @@ dir_openby_path (const char *path)
     {
       char part[NAME_MAX + 1];
       flag = get_next_part (part, (const char**)&t_path);
-      if (flag == -1) break;
+      /* if name was invalid, return failure */
+      if (flag == -1)
+        goto failed;
 
       struct inode *next_inode;
+      /* path validation */
       if (!dir_lookup (dir, part, &next_inode))
-        {
-          dir_close (dir);
-          return NULL;
-        }
-      dir_close (dir);
+        goto failed;
+
       struct dir *next_dir = dir_open (next_inode);
       if (next_dir == NULL)
-        return NULL;
+        goto failed;
+      
+      dir_close (dir);
       dir = next_dir;
     }
 
+  /* if directory has not been removed, then return it */
   if (!inode_get_removed (dir_get_inode (dir)))
     return dir;
 
-  dir_close (dir);
-  return NULL;
+  /* otherwise return NULL */
+  failed:
+    dir_close (dir);
+    return NULL;
   
 }
 
@@ -109,6 +114,7 @@ get_new_entry (block_sector_t sector, const char *name)
   return e;
 }
 
+/* Check whether the directory is empty or not */
 static bool
 check_directory (struct dir *dir)
 {
@@ -128,22 +134,23 @@ check_directory (struct dir *dir)
 bool
 dir_create (block_sector_t sector, size_t entry_cnt)
 {
-  if (!inode_create (sector, entry_cnt * sizeof (struct dir_entry), true))
+  // this should be checked
+  if (!inode_create (sector, (entry_cnt + 2) * sizeof (struct dir_entry), true))
     return false;
   
-  struct dir *dir = dir_open (inode_open (sector));
+  struct inode *dir_inode = inode_open (sector);
 
   struct dir_entry parent_entry = get_new_entry (sector, "..");
   struct dir_entry current_entry = get_new_entry (sector, ".");
 
   bool success;
-  success = inode_write_at (dir_get_inode (dir), &parent_entry, 
+  success = inode_write_at (dir_inode, &parent_entry, 
             sizeof (struct dir_entry), 0) == sizeof (struct dir_entry);
 
-  success &= inode_write_at (dir_get_inode (dir), &current_entry, 
+  success &= inode_write_at (dir_inode, &current_entry, 
             sizeof (struct dir_entry), sizeof (struct dir_entry)) == sizeof (struct dir_entry);
 
-  dir_close (dir);
+  inode_close (dir_inode);
   
   return success;
 }
@@ -157,6 +164,7 @@ dir_open (struct inode *inode)
   if (inode != NULL && dir != NULL)
     {
       dir->inode = inode;
+      /* may change because of readdir funcion. */
       dir->pos = 0;
       return dir;
     }
@@ -260,7 +268,7 @@ dir_lookup (const struct dir *dir, const char *name,
    Fails if NAME is invalid (i.e. too long) or a disk or memory
    error occurs. */
 bool
-dir_add (struct dir *dir, const char *name, block_sector_t inode_sector, bool is_dir)
+dir_add (struct dir *dir, const char *name, block_sector_t inode_sector)
 {
   struct dir_entry e;
   off_t ofs;
@@ -277,23 +285,25 @@ dir_add (struct dir *dir, const char *name, block_sector_t inode_sector, bool is
   if (lookup (dir, name, NULL, NULL))
     goto done;
 
-  if (is_dir)
-    {
-      struct dir *curr_dir = dir_open (inode_open (inode_sector));
-      if (curr_dir == NULL)
-        goto done;
+  /* if file does not exist, return false */
+  struct inode *dir_inode = inode_open (inode_sector);
+  if (dir_inode == NULL)
+    return false;
 
+  if (inode_disk_isdir (get_inode_disk (dir_inode)))
+    {
       struct dir_entry child_entry;
 
       child_entry = get_new_entry (inode_get_inumber (dir_get_inode (dir)), "..");
 
-      if (inode_write_at (curr_dir->inode, &child_entry, sizeof (struct dir_entry), 0)
+      /* error happened while writing at child directory */
+      if (inode_write_at (dir_inode, &child_entry, sizeof (struct dir_entry), 0)
             != sizeof (struct dir_entry))
         {
-          dir_close (curr_dir);
+          inode_close (dir_inode);
           return false;
         }
-      dir_close (curr_dir);
+      inode_close (dir_inode);
     }
 
   /* Set OFS to offset of free slot.
