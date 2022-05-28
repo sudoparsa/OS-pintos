@@ -386,7 +386,7 @@ dir_remove (struct dir *dir, const char *name)
   if (inode == NULL)
     goto done;
 
-  if (inode_disk_isdir (get_inode_disk (inode))) 
+  if (inode_isdir (inode))
     {
       struct dir *t_dir = dir_open (inode);
       bool empty = check_directory (t_dir);
@@ -399,7 +399,6 @@ dir_remove (struct dir *dir, const char *name)
   e.in_use = false;
   if (inode_write_at (dir->inode, &e, sizeof e, ofs) != sizeof e)
     goto done;
-
   /* Remove inode. */
   inode_remove (inode);
   success = true;

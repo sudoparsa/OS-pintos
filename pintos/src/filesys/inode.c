@@ -486,9 +486,11 @@ inode_disk_deallocate (struct inode *inode)
 {
   struct inode_disk *disk_inode = get_inode_disk (inode);
   size_t num_sectors_to_allocate = bytes_to_sectors (disk_inode->length);
+  printf ("num_sectors_to_allocate: %d, disk_inode: %p\n", num_sectors_to_allocate, disk_inode);
   size_t i;
   for (i = 0; i < num_sectors_to_allocate && i < DIRECT_BLOCK_NO; i++)
-    free_map_release (disk_inode->direct[i],1);
+    printf ("i: %d\n", i), free_map_release (disk_inode->direct[i],1);
+  printf ("end\n");
   num_sectors_to_allocate -= i;
   if (num_sectors_to_allocate == 0)
     {
@@ -513,7 +515,7 @@ inode_disk_deallocate (struct inode *inode)
 
   if (num_sectors_to_allocate > INDIRECT_BLOCK_NO * INDIRECT_BLOCK_NO)
     return false;
-  
+
   size_t no_blocks = DIV_ROUND_UP (num_sectors_to_allocate, INDIRECT_BLOCK_NO);
   for (i = 0; i < no_blocks; i++)
     {
