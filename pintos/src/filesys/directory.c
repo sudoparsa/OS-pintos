@@ -4,6 +4,7 @@
 #include <list.h>
 #include "filesys/filesys.h"
 #include "filesys/inode.h"
+#include "filesys/file.h"
 #include "threads/malloc.h"
 #include "threads/thread.h"
 
@@ -423,4 +424,25 @@ dir_readdir (struct dir *dir, char name[NAME_MAX + 1])
 
   dir->pos = 0;
   return false;
+}
+
+
+/* This function converts file descriptor pointers that are
+   a directory, to struct dir. Returns NULL in case the input
+   isn't a directory. */
+struct dir *
+dir_from_file (struct file *file)
+{
+  if (file == NULL)
+    return NULL;
+
+  struct inode *inode = file_get_inode(file);
+
+  if (inode == NULL)
+    return NULL;
+
+  if (!inode_isdir (inode))
+    return NULL;
+
+  return (struct dir *) file;
 }

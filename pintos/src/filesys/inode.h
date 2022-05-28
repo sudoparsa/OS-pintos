@@ -21,6 +21,7 @@ void inode_allow_write (struct inode *);
 off_t inode_length (const struct inode *);
 struct inode_disk *get_inode_disk (const struct inode *);
 bool inode_get_removed (const struct inode *);
+bool inode_isdir (const struct inode *);
 bool inode_disk_isdir (const struct inode_disk *);
 
 #endif /* filesys/inode.h */

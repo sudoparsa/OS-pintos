@@ -18,6 +18,7 @@ static void do_format (void);
 void
 filesys_init (bool format)
 {
+
   fs_device = block_get_role (BLOCK_FILESYS);
   if (fs_device == NULL)
     PANIC ("No file system device found, can't initialize file system.");
@@ -82,7 +83,16 @@ filesys_open (const char *path)
     dir_lookup (dir, tail, &inode);
   dir_close (dir);
 
-  return file_open (inode);
+  if (inode == NULL)
+  {
+    printf("path: `%s`\n", path);
+    return NULL;
+  }
+
+  if (inode_isdir (inode))
+    return (struct file *) dir_open (inode);
+  else
+    return file_open (inode);
 }
 
 /* Deletes the file named NAME.

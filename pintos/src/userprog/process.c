@@ -11,6 +11,7 @@
 #include "filesys/directory.h"
 #include "filesys/file.h"
 #include "filesys/filesys.h"
+#include "filesys/directory.h"
 #include "threads/flags.h"
 #include "threads/init.h"
 #include "threads/interrupt.h"
@@ -81,6 +82,7 @@ process_execute (const char *file_name)
   sema_init (&cps->sema, 0);
   lock_init (&cps->lock);
 
+  printf("1\n");
   fn_cps_->cps = cps;
   struct thread *cur = thread_current ();
   list_push_back (&(cur->children), &(cps->elem)); 
@@ -93,11 +95,13 @@ process_execute (const char *file_name)
   if (fn_copy == NULL)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
+  printf("2\n");
   
   fn_cps_->fn = fn_copy;
 
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_cps_);
+  printf("3\n");
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy);
   else
@@ -198,7 +202,12 @@ free_file_descriptors (struct thread *cur)
   for (i = 0; i < MAX_FILE_DESCRIPTORS; i++)
     {
       if (cur->file_descriptors[i] != NULL)
-        file_close (cur->file_descriptors[i]);
+      {
+        if (dir_from_file (cur->file_descriptors[i]) == NULL)
+          file_close (cur->file_descriptors[i]);
+        else
+          dir_close (dir_from_file (cur->file_descriptors[i]));
+      }
     }
 }
 

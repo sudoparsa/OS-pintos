@@ -306,6 +306,13 @@ inode_disk_isdir (const struct inode_disk *disk_inode)
   return disk_inode->is_dir;
 }
 
+bool
+inode_isdir (const struct inode *inode)
+{
+  struct inode_disk *disk_inode = get_inode_disk (inode);
+  return inode_disk_isdir (disk_inode);
+}
+
 
 /* Closes INODE and writes it to disk.
    If this was the last reference to INODE, frees its memory.

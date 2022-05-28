@@ -313,7 +313,10 @@ close_syscall (struct intr_frame *f, uint32_t* args, struct thread* trd)
   if (!check_fd (trd, args[1]) || args[1] < 3)
       EXIT_WITH_ERROR;
   lock_acquire(&global_lock);
-  file_close (trd->file_descriptors[args[1]]);
+  if (dir_from_file (trd->file_descriptors[args[1]]) == NULL)
+    file_close (trd->file_descriptors[args[1]]);
+  else
+    dir_close (dir_from_file (trd->file_descriptors[args[1]]));
   lock_release(&global_lock);
   trd->file_descriptors[args[1]] = NULL;
 }
@@ -354,7 +357,13 @@ read_syscall (struct intr_frame *f, uint32_t* args, struct thread* trd)
       EXIT_WITH_ERROR;
 
   lock_acquire(&global_lock);
-  f->eax = file_read (trd->file_descriptors[fd], buffer, length);
+  if (dir_from_file (trd->file_descriptors[fd]) == NULL)
+    f->eax = file_read (trd->file_descriptors[fd], buffer, length);
+  else
+  {
+    lock_release(&global_lock);
+    EXIT_WITH_ERROR;
+  }
   lock_release(&global_lock);
 }
 
@@ -379,14 +388,16 @@ write_syscall (struct intr_frame *f, uint32_t* args, struct thread* trd)
       EXIT_WITH_ERROR;
 
   lock_acquire(&global_lock);
-  f->eax = file_write (trd->file_descriptors[fd], buffer, length);
+  if (dir_from_file (trd->file_descriptors[fd]) == NULL)
+    f->eax = file_write (trd->file_descriptors[fd], buffer, length);
+  else
+    f->eax = 0;
   lock_release(&global_lock);
 }
 
 static void 
 filesize_syscall (struct intr_frame *f, uint32_t* args, struct thread* trd)
 {
-
   CHECK_ARGS (args, 1, VALUE);
 
   int fd = (int) args[1];
