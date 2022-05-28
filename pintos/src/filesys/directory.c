@@ -52,60 +52,83 @@ get_next_part(char part[NAME_MAX + 1], const char** srcp)
   return 1;
 }
 
-struct dir *
-dir_openby_path (const char *path)
+
+/* Reports the parent directory and the name of file/directory
+   in `tail`. Note that `tail` must have allocated at least
+   `NAME_MAX + 1` bytes of memory. `tail` will change to empty
+   string in case of failure. */
+bool
+dir_divide_path(struct dir **parent, char *tail, const char *path)
 {
-  struct thread *curr_thread = thread_current ();
+  const char *t_path = path;
 
-  struct dir *dir;
-  
-  // check in the future
-  /* absoloute */
   if (path[0] == '/')
-    dir = dir_open_root ();
-  /* relative */
+    *parent = dir_open_root ();
   else
-    dir = dir_reopen (curr_thread->cwd);
+  {
+    // This is done to prevent PANIC before thread creation.
+    if (thread_current ()->cwd == NULL)
+      *parent = dir_open_root ();
+    else
+      *parent = dir_reopen (thread_current ()->cwd);
+  }
 
-  char t_path[strlen(path) + 1];
-  strlcpy (t_path, path, sizeof t_path);
-
-  int flag = 1;
-  
+  *tail = '\0';
   while (true)
+  {
+    struct inode *next_inode = NULL;
+    bool failed_lookup = false;
+    if (strlen(tail) > 0)
     {
-      char part[NAME_MAX + 1];
-      flag = get_next_part (part, (const char**)&t_path);
-      /* if name is invalid, return failure. */
-      if (flag == -1)
-        goto failed;
-      
-      /* end of path */
-      if (flag == 0)
-        break;
-
-      struct inode *next_inode;
-      /* path validation */
-      if (!dir_lookup (dir, part, &next_inode))
-        goto failed;
-
-      struct dir *next_dir = dir_open (next_inode);
-      if (next_dir == NULL)
-        goto failed;
-      
-      dir_close (dir);
-      dir = next_dir;
+      if (!dir_lookup (*parent, tail, &next_inode))
+        failed_lookup = true;
     }
 
-  /* if directory has not been removed, then return it */
-  if (!inode_get_removed (dir_get_inode (dir)))
-    return dir;
+    int result = get_next_part (tail, &t_path);
+    if (result < 0)
+      goto failed;
+    else if (result == 0)
+      break;
+    else {
+      if (failed_lookup)
+        goto failed;
+      if (next_inode) {
+        if (inode_get_removed (next_inode))
+          goto failed;
+        struct dir *next_dir = dir_open(next_inode);
+        if (next_dir == NULL)
+          goto failed;
 
-  /* otherwise return NULL */
+        dir_close (*parent);
+        *parent = next_dir;
+      }
+    }
+  }
+
+  return true;
+
   failed:
-    dir_close (dir);
+  *tail = '\0';
+  dir_close (*parent);
+  return false;
+}
+
+/* Opens the directory in path. Returns NULL on failure. */
+struct dir *
+dir_open_by_path (const char *path)
+{
+  char tail[NAME_MAX + 1];
+  struct dir *parent;
+  dir_divide_path(&parent, tail, path);
+
+  struct inode *inode;
+  if (!dir_lookup (parent, tail, &inode) || inode_get_removed (inode))
+  {
+    dir_close (parent);
     return NULL;
-  
+  }
+
+  return dir_open (inode);
 }
 
 static struct dir_entry
@@ -396,5 +419,7 @@ dir_readdir (struct dir *dir, char name[NAME_MAX + 1])
           return true;
         }
     }
+
+  dir->pos = 0;
   return false;
 }

@@ -45,37 +45,47 @@ filesys_done (void)
    Fails if a file named NAME already exists,
    or if internal memory allocation fails. */
 bool
-filesys_create (const char *name, off_t initial_size)
+filesys_create (const char *path, off_t initial_size, bool directory)
 {
   block_sector_t inode_sector = 0;
-  struct dir *dir = dir_open_root ();
-  bool success = (dir != NULL
+  struct dir *parent;
+  char tail[NAME_MAX + 1];
+
+  bool success = (dir_divide_path (&parent, tail, path)
+                  && tail[0] != '\0'
+                  && parent != NULL
                   && free_map_allocate (1, &inode_sector)
-                  && inode_create (inode_sector, initial_size, false)
-                  && dir_add (dir, name, inode_sector));
+                  && (directory
+                      ?dir_create (inode_sector, 16)
+                      :inode_create (inode_sector, initial_size, false))
+                  && dir_add (parent, tail, inode_sector));
   if (!success && inode_sector != 0)
     free_map_release (inode_sector, 1);
-  dir_close (dir);
+  dir_close (parent);
 
   return success;
 }
-
 /* Opens the file with the given NAME.
-   Returns the new file if successful or a null pointer
-   otherwise.
+   Puts the file/directory in the given `descriptor`.
    Fails if no file named NAME exists,
    or if an internal memory allocation fails. */
-struct file *
-filesys_open (const char *name)
+void
+filesys_open (const char *path, struct descriptor *descriptor)
 {
-  struct dir *dir = dir_open_root ();
+  char tail[NAME_MAX + 1];
+  struct dir *dir = NULL;
+  dir_divide_path(&dir, tail, path);
   struct inode *inode = NULL;
 
   if (dir != NULL)
-    dir_lookup (dir, name, &inode);
+    dir_lookup (dir, tail, &inode);
   dir_close (dir);
 
-  return file_open (inode);
+  struct inode_disk *inode_disk = get_inode_disk (inode);
+  if (inode_disk_isdir (inode_disk))
+    descriptor->dir = dir_open(inode);
+  else
+    descriptor->file = file_open (inode);
 }
 
 /* Deletes the file named NAME.

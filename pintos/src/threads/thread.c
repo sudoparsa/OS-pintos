@@ -591,7 +591,7 @@ thread_get_free_file_descriptor(struct thread * t)
      text file probably) 2 are reserved. */
   for (int i = 3; i < MAX_FILE_DESCRIPTORS; i ++)
     {
-      if (t->file_descriptors[i] == NULL)
+      if (t->file_descriptors[i].file == NULL && t->file_descriptors[i].dir == NULL)
         return i;
     }
   return -1;
