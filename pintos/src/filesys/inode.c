@@ -309,10 +309,14 @@ inode_disk_isdir (const struct inode_disk *disk_inode)
 bool
 inode_isdir (const struct inode *inode)
 {
-  struct inode_disk *disk_inode = get_inode_disk (inode);
+  if (inode == NULL)
+    return false;
+  struct inode_disk *disk_inode = get_inode_disk(inode);
   if (disk_inode == NULL)
     return false;
-  return inode_disk_isdir (disk_inode);
+  bool result = inode_disk_isdir (disk_inode);
+  free(disk_inode);
+  return result;
 }
 
 
@@ -524,4 +528,10 @@ inode_disk_deallocate (struct inode *inode)
   free_map_release(disk_inode->double_indirect, 1);
   free(disk_inode);
   return true;
+}
+
+struct lock *inode_lock(struct inode *inode)
+{
+  ASSERT (inode);
+  return &(inode->f_lock);
 }

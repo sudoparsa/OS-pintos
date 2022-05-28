@@ -194,7 +194,7 @@ dir_open (struct inode *inode)
     {
       dir->inode = inode;
       /* may change because of readdir funcion. */
-      dir->pos = 0;
+      dir->pos = 2 * sizeof (struct dir_entry);
       return dir;
     }
   else
@@ -417,12 +417,13 @@ dir_readdir (struct dir *dir, char name[NAME_MAX + 1])
       dir->pos += sizeof e;
       if (e.in_use)
         {
+//          printf("found at pos: %d\n", dir->pos);
           strlcpy (name, e.name, NAME_MAX + 1);
           return true;
         }
     }
 
-  dir->pos = 0;
+  dir->pos = 2 * sizeof e;
   return false;
 }
 

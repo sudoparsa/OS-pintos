@@ -88,12 +88,13 @@ filesys_open (const char *path)
     // printf("path: `%s`\n", path);
     return NULL;
   }
-  // struct file* res;
-  // if (inode_isdir (inode)){
-  //   res = (struct file *) dir_open (inode);
-  //   printf("gell%p\n",res);
-  // }
-  // else
+  struct file* res;
+  if (inode_isdir (inode))
+  {
+    res = (struct file *) dir_open (inode);
+    return res;
+  }
+  else
     return file_open (inode);
 }
 

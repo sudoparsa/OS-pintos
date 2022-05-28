@@ -16,6 +16,7 @@
 #include "threads/synch.h"
 
 #define MAX_SYSCALL_ARGUMENTS     10
+#define READDIR_MAX_LEN 14
 #define STRING -1
 #define VALUE 0
 
@@ -36,6 +37,8 @@ static void wait_syscall (struct intr_frame *, uint32_t*);
 static void practice_syscall (struct intr_frame *, uint32_t*);
 static void chdir_syscall (struct intr_frame *, uint32_t*, struct thread*);
 static void mkdir_syscall (struct intr_frame *, uint32_t*);
+static void readdir_syscall (struct intr_frame *, uint32_t*, struct thread*);
+static void isdir_syscall (struct intr_frame *, uint32_t*, struct thread*);
 static void inumber_syscall (struct intr_frame *, uint32_t*, struct thread*);
 
 void
@@ -218,8 +221,10 @@ syscall_handler (struct intr_frame *f)
         mkdir_syscall (f, args);
         break;
       case SYS_READDIR:                // Reads a directory entry.
+        readdir_syscall (f, args, trd);
+        break;
       case SYS_ISDIR:                  // Tests if a fd represents a directory.
-        printf("syscall received\n");
+        isdir_syscall (f, args, trd);
         break;
       case SYS_INUMBER:                // Returns the inode number for a fd.
         inumber_syscall (f, args, trd);
@@ -313,10 +318,10 @@ close_syscall (struct intr_frame *f, uint32_t* args, struct thread* trd)
   if (!check_fd (trd, args[1]) || args[1] < 3)
       EXIT_WITH_ERROR;
   // lock_acquire(&global_lock);
-  // if (dir_from_file (trd->file_descriptors[args[1]]) == NULL)
+   if (dir_from_file (trd->file_descriptors[args[1]]) == NULL)
     file_close (trd->file_descriptors[args[1]]);
-  // else
-  //   dir_close (dir_from_file (trd->file_descriptors[args[1]]));
+   else
+     dir_close (dir_from_file (trd->file_descriptors[args[1]]));
   // lock_release(&global_lock);
   trd->file_descriptors[args[1]] = NULL;
 }
@@ -468,6 +473,50 @@ mkdir_syscall (struct intr_frame *f, uint32_t* args)
   const char *path = (const char *) args[1];
 
   f->eax = filesys_create (path, 0 /* unused */, true);
+}
+
+static void
+readdir_syscall (struct intr_frame *f, uint32_t* args, struct thread* trd)
+{
+  CHECK_ARGS (args, 2, VALUE, NAME_MAX + 1);
+
+  int fd = (int) args[1];
+  char *name = (char *) args[2];
+
+  /* Fail when reading a wrong fd or standard output */
+  if (!check_fd (trd, fd) || fd == 1)
+  {
+    f->eax = false;
+    return;
+  }
+
+  struct dir *dir = dir_from_file (trd->file_descriptors[fd]);
+
+  if (dir == NULL)
+  {
+    f->eax = false;
+    return;
+  }
+
+  struct lock *lock = inode_lock (dir_get_inode (dir));
+  lock_acquire (lock);
+
+  f->eax = dir_readdir (dir, name);
+//  printf("readdir: `%s`\n", name);
+
+  lock_release (lock);
+}
+
+static void
+isdir_syscall (struct intr_frame *f, uint32_t* args, struct thread* trd)
+{
+  CHECK_ARGS (args, 1, VALUE);
+
+  struct inode *inode;
+  if (!get_inode_from_fd (&inode, args[1], trd))
+    EXIT_WITH_ERROR;
+
+  f->eax = inode_isdir (inode);
 }
 
 static void

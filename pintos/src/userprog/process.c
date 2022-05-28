@@ -210,10 +210,10 @@ free_file_descriptors (struct thread *cur)
     {
       if (cur->file_descriptors[i] != NULL)
       {
-        // if (dir_from_file (cur->file_descriptors[i]) == NULL)
+        if (dir_from_file (cur->file_descriptors[i]) == NULL)
           file_close (cur->file_descriptors[i]);
-        // else
-        //   dir_close (dir_from_file (cur->file_descriptors[i]));
+        else
+          dir_close (dir_from_file (cur->file_descriptors[i]));
       }
     }
 }
