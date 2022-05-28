@@ -310,6 +310,8 @@ bool
 inode_isdir (const struct inode *inode)
 {
   struct inode_disk *disk_inode = get_inode_disk (inode);
+  if (disk_inode == NULL)
+    return false;
   return inode_disk_isdir (disk_inode);
 }
 

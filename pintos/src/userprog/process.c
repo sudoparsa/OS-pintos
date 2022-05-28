@@ -82,12 +82,11 @@ process_execute (const char *file_name)
   sema_init (&cps->sema, 0);
   lock_init (&cps->lock);
 
-  printf("1\n");
+  // printf("1\n");
   fn_cps_->cps = cps;
   struct thread *cur = thread_current ();
   list_push_back (&(cur->children), &(cps->elem)); 
-
-
+  fn_cps_->cwd = cur->cwd;
   sema_init (&temporary, 0);
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
@@ -95,13 +94,13 @@ process_execute (const char *file_name)
   if (fn_copy == NULL)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
-  printf("2\n");
+  // printf("2\n");
   
   fn_cps_->fn = fn_copy;
 
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_cps_);
-  printf("3\n");
+  // printf("3\n");
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy);
   else
@@ -137,6 +136,12 @@ start_process (void *fn)
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (file_name, &if_.eip, &if_.esp);
+  if (fn_cps_->cwd){
+    cur->cwd = dir_reopen (fn_cps_->cwd);
+  }
+  else{
+    cur->cwd = dir_open_root ();
+  }
   fn_cps_->success = success;
 
   palloc_free_page (file_name);
@@ -148,6 +153,8 @@ start_process (void *fn)
       sema_up (&cps->sema);
       thread_exit ();
     }
+
+  
 
   sema_up (&cps->sema);
 
@@ -203,10 +210,10 @@ free_file_descriptors (struct thread *cur)
     {
       if (cur->file_descriptors[i] != NULL)
       {
-        if (dir_from_file (cur->file_descriptors[i]) == NULL)
+        // if (dir_from_file (cur->file_descriptors[i]) == NULL)
           file_close (cur->file_descriptors[i]);
-        else
-          dir_close (dir_from_file (cur->file_descriptors[i]));
+        // else
+        //   dir_close (dir_from_file (cur->file_descriptors[i]));
       }
     }
 }
@@ -228,6 +235,10 @@ process_exit (void)
   free_finished_threads (&cur->children);
 
   free_file_descriptors (cur);
+
+  if (cur->cwd){
+    dir_close(cur->cwd);
+  }
 
   uint32_t *pd;
   /* Destroy the current process's page directory and switch back
@@ -263,7 +274,6 @@ free_finished_threads (struct list *threads)
       lock_acquire (&(child->lock));
       (child->ref_count)--;
       lock_release (&(child->lock));
-
       if (child->ref_count == 0)
           finished_threads[size++] = child;
     }

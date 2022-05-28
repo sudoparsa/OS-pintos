@@ -108,7 +108,7 @@ struct fn_cps
     char *fn;                           /* File name. */
 
     struct child_parent_status *cps;    /* Child parent status. */
-
+    struct dir *cwd;
     bool success;                       /* Boolean to show load result. */
   };
 

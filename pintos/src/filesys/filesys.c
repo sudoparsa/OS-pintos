@@ -85,13 +85,15 @@ filesys_open (const char *path)
 
   if (inode == NULL)
   {
-    printf("path: `%s`\n", path);
+    // printf("path: `%s`\n", path);
     return NULL;
   }
-
-  if (inode_isdir (inode))
-    return (struct file *) dir_open (inode);
-  else
+  // struct file* res;
+  // if (inode_isdir (inode)){
+  //   res = (struct file *) dir_open (inode);
+  //   printf("gell%p\n",res);
+  // }
+  // else
     return file_open (inode);
 }
 

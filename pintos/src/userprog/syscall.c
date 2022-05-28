@@ -264,9 +264,9 @@ create_syscall (struct intr_frame *f, uint32_t* args)
 {
   CHECK_ARGS (args, 2, STRING, VALUE);
 
-  lock_acquire(&global_lock);
+  // lock_acquire(&global_lock);
   f->eax = filesys_create ((const char *) args[1], args[2], false);
-  lock_release(&global_lock);
+  // lock_release(&global_lock);
 }
 
 static void
@@ -274,9 +274,9 @@ remove_syscall (struct intr_frame *f, uint32_t* args)
 {
   CHECK_ARGS (args, 1, STRING);
 
-  lock_acquire(&global_lock);
+  // lock_acquire(&global_lock);
   f->eax = filesys_remove ((const char *) args[1]);
-  lock_release(&global_lock);
+  // lock_release(&global_lock);
 }
 
 static void
@@ -296,9 +296,9 @@ open_syscall (struct intr_frame *f, uint32_t* args, struct thread* trd)
   f->eax = fd;
   if (fd > 0)
     {
-      lock_acquire(&global_lock);
+      // lock_acquire(&global_lock);
       trd->file_descriptors[fd] = filesys_open ((const char *) args[1]);
-      lock_release(&global_lock);
+      // lock_release(&global_lock);
       if (trd->file_descriptors[fd] == NULL)
         f->eax = -1;
     }
@@ -312,12 +312,12 @@ close_syscall (struct intr_frame *f, uint32_t* args, struct thread* trd)
   /* Fail when closing a wrong fd. */
   if (!check_fd (trd, args[1]) || args[1] < 3)
       EXIT_WITH_ERROR;
-  lock_acquire(&global_lock);
-  if (dir_from_file (trd->file_descriptors[args[1]]) == NULL)
+  // lock_acquire(&global_lock);
+  // if (dir_from_file (trd->file_descriptors[args[1]]) == NULL)
     file_close (trd->file_descriptors[args[1]]);
-  else
-    dir_close (dir_from_file (trd->file_descriptors[args[1]]));
-  lock_release(&global_lock);
+  // else
+  //   dir_close (dir_from_file (trd->file_descriptors[args[1]]));
+  // lock_release(&global_lock);
   trd->file_descriptors[args[1]] = NULL;
 }
 
@@ -356,15 +356,15 @@ read_syscall (struct intr_frame *f, uint32_t* args, struct thread* trd)
   if (!check_fd (trd, fd) || fd == 1)
       EXIT_WITH_ERROR;
 
-  lock_acquire(&global_lock);
-  if (dir_from_file (trd->file_descriptors[fd]) == NULL)
+  // lock_acquire(&global_lock);
+  // if (dir_from_file (trd->file_descriptors[fd]) == NULL)
     f->eax = file_read (trd->file_descriptors[fd], buffer, length);
-  else
-  {
-    lock_release(&global_lock);
-    EXIT_WITH_ERROR;
-  }
-  lock_release(&global_lock);
+  // else
+  // {
+  //   // lock_release(&global_lock);
+  //   EXIT_WITH_ERROR;
+  // }
+  // lock_release(&global_lock);
 }
 
 static void 
@@ -387,12 +387,12 @@ write_syscall (struct intr_frame *f, uint32_t* args, struct thread* trd)
   if (!check_fd (trd, fd) || !fd)
       EXIT_WITH_ERROR;
 
-  lock_acquire(&global_lock);
+  // lock_acquire(&global_lock);
   if (dir_from_file (trd->file_descriptors[fd]) == NULL)
     f->eax = file_write (trd->file_descriptors[fd], buffer, length);
   else
-    f->eax = 0;
-  lock_release(&global_lock);
+    f->eax = -1;
+  // lock_release(&global_lock);
 }
 
 static void 
@@ -406,9 +406,9 @@ filesize_syscall (struct intr_frame *f, uint32_t* args, struct thread* trd)
   if (!check_fd(trd, fd) || fd == 0 || fd == 1)
       EXIT_WITH_ERROR;
 
-  lock_acquire(&global_lock);
+  // lock_acquire(&global_lock);
   f->eax = file_length (trd->file_descriptors[fd]);
-  lock_release(&global_lock);
+  // lock_release(&global_lock);
 }
 
 static void 
@@ -422,9 +422,9 @@ tell_syscall (struct intr_frame *f, uint32_t* args, struct thread* trd)
   if (!check_fd (trd, fd) || fd == 0 || fd == 1)
       EXIT_WITH_ERROR;
   
-  lock_acquire(&global_lock);
+  // lock_acquire(&global_lock);
   f->eax = file_tell (trd->file_descriptors[fd]);
-  lock_release(&global_lock);
+  // lock_release(&global_lock);
 }
 
 static void 
@@ -439,9 +439,9 @@ seek_syscall (struct intr_frame *f, uint32_t* args, struct thread* trd)
   if (!check_fd (trd, fd) || fd == 0 || fd == 1)
       EXIT_WITH_ERROR;
   
-  lock_acquire(&global_lock);
+  // lock_acquire(&global_lock);
   file_seek (trd->file_descriptors[fd], position);
-  lock_release(&global_lock);
+  // lock_release(&global_lock);
   f->eax = 0;
 }
 
