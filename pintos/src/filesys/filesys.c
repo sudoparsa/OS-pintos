@@ -74,6 +74,11 @@ filesys_create (const char *path, off_t initial_size, bool directory)
 struct file *
 filesys_open (const char *path)
 {
+  if (strcmp(path, "/") == 0)
+  {
+    return (struct file *) dir_open_root ();
+  }
+
   char tail[NAME_MAX + 1];
   struct dir *dir = NULL;
   dir_divide_path(&dir, tail, path);

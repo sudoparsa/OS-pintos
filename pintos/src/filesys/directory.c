@@ -119,6 +119,11 @@ dir_divide_path(struct dir **parent, char *tail, const char *path)
 struct dir *
 dir_open_by_path (const char *path)
 {
+  if (strcmp(path, "/") == 0)
+  {
+    return dir_open_root ();
+  }
+
   char tail[NAME_MAX + 1];
   struct dir *parent;
   dir_divide_path(&parent, tail, path);
