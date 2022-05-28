@@ -7,6 +7,8 @@
 #include "filesys/free-map.h"
 #include "threads/malloc.h"
 #include "filesys/cache.h"
+#include "threads/synch.h"
+
 
 /* Identifies an inode. */
 #define INODE_MAGIC 0x494e4f44
@@ -368,6 +370,8 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset)
   uint8_t *buffer = buffer_;
   off_t bytes_read = 0;
 
+  lock_acquire (&inode->f_lock);
+
   while (size > 0)
     {
       /* Disk sector to read, starting byte offset within sector. */
@@ -394,6 +398,8 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset)
       bytes_read += chunk_size;
     }
 
+  lock_release (&inode->f_lock);
+
   return bytes_read;
 }
 
@@ -411,6 +417,9 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
 
   if (inode->deny_write_cnt)
     return 0;
+
+  lock_acquire(&inode->f_lock);
+
   if (byte_to_sector (inode, offset + size-1) == (size_t) -1)
    {
     struct inode_disk *id = get_inode_disk (inode);
@@ -449,6 +458,8 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
       bytes_written += chunk_size;
     }
 
+  lock_release (&inode->f_lock);
+
   return bytes_written;
 }
 
@@ -485,12 +496,14 @@ static bool
 inode_disk_deallocate (struct inode *inode)
 {
   struct inode_disk *disk_inode = get_inode_disk (inode);
+
+  if (disk_inode == NULL)
+    return true;
+
   size_t num_sectors_to_allocate = bytes_to_sectors (disk_inode->length);
-  printf ("num_sectors_to_allocate: %d, disk_inode: %p\n", num_sectors_to_allocate, disk_inode);
   size_t i;
   for (i = 0; i < num_sectors_to_allocate && i < DIRECT_BLOCK_NO; i++)
-    printf ("i: %d\n", i), free_map_release (disk_inode->direct[i],1);
-  printf ("end\n");
+    free_map_release (disk_inode->direct[i],1);
   num_sectors_to_allocate -= i;
   if (num_sectors_to_allocate == 0)
     {

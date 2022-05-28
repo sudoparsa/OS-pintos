@@ -82,7 +82,6 @@ process_execute (const char *file_name)
   sema_init (&cps->sema, 0);
   lock_init (&cps->lock);
 
-  // printf("1\n");
   fn_cps_->cps = cps;
   struct thread *cur = thread_current ();
   list_push_back (&(cur->children), &(cps->elem)); 
@@ -94,13 +93,12 @@ process_execute (const char *file_name)
   if (fn_copy == NULL)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
-  // printf("2\n");
   
   fn_cps_->fn = fn_copy;
 
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_cps_);
-  // printf("3\n");
+
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy);
   else
@@ -136,12 +134,12 @@ start_process (void *fn)
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (file_name, &if_.eip, &if_.esp);
-  if (fn_cps_->cwd){
+  
+  if (fn_cps_->cwd)
     cur->cwd = dir_reopen (fn_cps_->cwd);
-  }
-  else{
+  else
     cur->cwd = dir_open_root ();
-  }
+
   fn_cps_->success = success;
 
   palloc_free_page (file_name);
@@ -236,9 +234,9 @@ process_exit (void)
 
   free_file_descriptors (cur);
 
-  if (cur->cwd){
+  if (cur->cwd)
     dir_close(cur->cwd);
-  }
+  
 
   uint32_t *pd;
   /* Destroy the current process's page directory and switch back

@@ -44,7 +44,6 @@ static void inumber_syscall (struct intr_frame *, uint32_t*, struct thread*);
 void
 syscall_init (void)
 {
-  lock_init(&global_lock);
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
@@ -269,9 +268,7 @@ create_syscall (struct intr_frame *f, uint32_t* args)
 {
   CHECK_ARGS (args, 2, STRING, VALUE);
 
-  // lock_acquire(&global_lock);
   f->eax = filesys_create ((const char *) args[1], args[2], false);
-  // lock_release(&global_lock);
 }
 
 static void
@@ -279,9 +276,7 @@ remove_syscall (struct intr_frame *f, uint32_t* args)
 {
   CHECK_ARGS (args, 1, STRING);
 
-  // lock_acquire(&global_lock);
   f->eax = filesys_remove ((const char *) args[1]);
-  // lock_release(&global_lock);
 }
 
 static void
@@ -301,9 +296,7 @@ open_syscall (struct intr_frame *f, uint32_t* args, struct thread* trd)
   f->eax = fd;
   if (fd > 0)
     {
-      // lock_acquire(&global_lock);
       trd->file_descriptors[fd] = filesys_open ((const char *) args[1]);
-      // lock_release(&global_lock);
       if (trd->file_descriptors[fd] == NULL)
         f->eax = -1;
     }
@@ -317,12 +310,12 @@ close_syscall (struct intr_frame *f, uint32_t* args, struct thread* trd)
   /* Fail when closing a wrong fd. */
   if (!check_fd (trd, args[1]) || args[1] < 3)
       EXIT_WITH_ERROR;
-  // lock_acquire(&global_lock);
+
    if (dir_from_file (trd->file_descriptors[args[1]]) == NULL)
     file_close (trd->file_descriptors[args[1]]);
    else
      dir_close (dir_from_file (trd->file_descriptors[args[1]]));
-  // lock_release(&global_lock);
+
   trd->file_descriptors[args[1]] = NULL;
 }
 
@@ -361,15 +354,7 @@ read_syscall (struct intr_frame *f, uint32_t* args, struct thread* trd)
   if (!check_fd (trd, fd) || fd == 1)
       EXIT_WITH_ERROR;
 
-  // lock_acquire(&global_lock);
-  // if (dir_from_file (trd->file_descriptors[fd]) == NULL)
-    f->eax = file_read (trd->file_descriptors[fd], buffer, length);
-  // else
-  // {
-  //   // lock_release(&global_lock);
-  //   EXIT_WITH_ERROR;
-  // }
-  // lock_release(&global_lock);
+  f->eax = file_read (trd->file_descriptors[fd], buffer, length);
 }
 
 static void 
@@ -392,12 +377,10 @@ write_syscall (struct intr_frame *f, uint32_t* args, struct thread* trd)
   if (!check_fd (trd, fd) || !fd)
       EXIT_WITH_ERROR;
 
-  // lock_acquire(&global_lock);
   if (dir_from_file (trd->file_descriptors[fd]) == NULL)
     f->eax = file_write (trd->file_descriptors[fd], buffer, length);
   else
     f->eax = -1;
-  // lock_release(&global_lock);
 }
 
 static void 
@@ -411,9 +394,7 @@ filesize_syscall (struct intr_frame *f, uint32_t* args, struct thread* trd)
   if (!check_fd(trd, fd) || fd == 0 || fd == 1)
       EXIT_WITH_ERROR;
 
-  // lock_acquire(&global_lock);
   f->eax = file_length (trd->file_descriptors[fd]);
-  // lock_release(&global_lock);
 }
 
 static void 
@@ -427,9 +408,7 @@ tell_syscall (struct intr_frame *f, uint32_t* args, struct thread* trd)
   if (!check_fd (trd, fd) || fd == 0 || fd == 1)
       EXIT_WITH_ERROR;
   
-  // lock_acquire(&global_lock);
   f->eax = file_tell (trd->file_descriptors[fd]);
-  // lock_release(&global_lock);
 }
 
 static void 
@@ -444,9 +423,8 @@ seek_syscall (struct intr_frame *f, uint32_t* args, struct thread* trd)
   if (!check_fd (trd, fd) || fd == 0 || fd == 1)
       EXIT_WITH_ERROR;
   
-  // lock_acquire(&global_lock);
   file_seek (trd->file_descriptors[fd], position);
-  // lock_release(&global_lock);
+
   f->eax = 0;
 }
 
@@ -457,10 +435,10 @@ chdir_syscall (struct intr_frame *f, uint32_t* args, struct thread* trd)
 
   struct dir *dir = dir_open_by_path((const char *) args[1]);
   if (dir != NULL)
-  {
-    trd->cwd = dir;
-    f->eax = true;
-  }
+    {
+      trd->cwd = dir;
+      f->eax = true;
+    }
   else
     f->eax = false;
 }
@@ -485,26 +463,20 @@ readdir_syscall (struct intr_frame *f, uint32_t* args, struct thread* trd)
 
   /* Fail when reading a wrong fd or standard output */
   if (!check_fd (trd, fd) || fd == 1)
-  {
-    f->eax = false;
-    return;
-  }
+    {
+      f->eax = false;
+      return;
+    }
 
   struct dir *dir = dir_from_file (trd->file_descriptors[fd]);
 
   if (dir == NULL)
-  {
-    f->eax = false;
-    return;
-  }
-
-  struct lock *lock = inode_lock (dir_get_inode (dir));
-  lock_acquire (lock);
+    {
+      f->eax = false;
+      return;
+    }
 
   f->eax = dir_readdir (dir, name);
-//  printf("readdir: `%s`\n", name);
-
-  lock_release (lock);
 }
 
 static void

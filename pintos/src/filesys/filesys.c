@@ -113,7 +113,7 @@ filesys_remove (const char *path)
   char tail[NAME_MAX + 1];
   struct dir *dir = NULL;
   dir_divide_path(&dir, tail, path);
-
+  
   bool success = dir != NULL && dir_remove (dir, tail);
   dir_close (dir);
 

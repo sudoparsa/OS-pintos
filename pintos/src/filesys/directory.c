@@ -421,7 +421,6 @@ dir_readdir (struct dir *dir, char name[NAME_MAX + 1])
       dir->pos += sizeof e;
       if (e.in_use)
         {
-//          printf("found at pos: %d\n", dir->pos);
           strlcpy (name, e.name, NAME_MAX + 1);
           return true;
         }
