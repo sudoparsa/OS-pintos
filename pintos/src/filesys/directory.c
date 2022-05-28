@@ -109,6 +109,7 @@ dir_divide_path(struct dir **parent, char *tail, const char *path)
 
   failed:
   *tail = '\0';
+  *parent = NULL;
   dir_close (*parent);
   return false;
 }
