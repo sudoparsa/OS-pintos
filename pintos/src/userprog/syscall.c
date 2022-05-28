@@ -9,9 +9,9 @@
 #include "filesys/file.h"
 #include "filesys/filesys.h"
 #include "filesys/inode.h"
-#include "devices/shutdown.h"
 #include "filesys/directory.h"
 #include "devices/input.h"
+#include "devices/shutdown.h"
 #include "userprog/process.h"
 #include "threads/synch.h"
 
@@ -129,7 +129,7 @@ check_fd(struct thread *t, int fd)
   if (fd > MAX_FILE_DESCRIPTORS || fd < 0)
     return false;
 
-  if (t->file_descriptors[fd].file == NULL && t->file_descriptors[fd].dir == NULL)
+  if (t->file_descriptors[fd] == NULL)
     return false;
 
   return true;
@@ -144,17 +144,8 @@ get_inode_from_fd(struct inode **inode, int fd, struct thread *trd)
   if (!check_fd(trd, fd) || fd == 0 || fd == 1)
     return false;
 
-  if (trd->file_descriptors[fd].file != NULL)
-  {
-    struct file* descriptor = trd->file_descriptors[fd].file;
-    *inode = file_get_inode (descriptor);
-  }
-
-  if (trd->file_descriptors[fd].dir != NULL)
-  {
-    struct dir* descriptor = trd->file_descriptors[fd].dir;
-    *inode = dir_get_inode (descriptor);
-  }
+  struct file* descriptor = trd->file_descriptors[fd];
+  *inode = file_get_inode (descriptor);
   return true;
 }
 
@@ -306,9 +297,9 @@ open_syscall (struct intr_frame *f, uint32_t* args, struct thread* trd)
   if (fd > 0)
     {
       lock_acquire(&global_lock);
-      filesys_open ((const char *) args[1], &trd->file_descriptors[fd]);
+      trd->file_descriptors[fd] = filesys_open ((const char *) args[1]);
       lock_release(&global_lock);
-      if (trd->file_descriptors[fd].file == NULL && trd->file_descriptors[fd].dir == NULL)
+      if (trd->file_descriptors[fd] == NULL)
         f->eax = -1;
     }
 }
@@ -322,16 +313,9 @@ close_syscall (struct intr_frame *f, uint32_t* args, struct thread* trd)
   if (!check_fd (trd, args[1]) || args[1] < 3)
       EXIT_WITH_ERROR;
   lock_acquire(&global_lock);
-  if (trd->file_descriptors[args[1]].file != NULL)
-  {
-    file_close (trd->file_descriptors[args[1]].file);
-    trd->file_descriptors[args[1]].file = NULL;
-  }
-  if (trd->file_descriptors[args[1]].dir != NULL) {
-    dir_close (trd->file_descriptors[args[1]].dir);
-    trd->file_descriptors[args[1]].dir = NULL;
-  }
+  file_close (trd->file_descriptors[args[1]]);
   lock_release(&global_lock);
+  trd->file_descriptors[args[1]] = NULL;
 }
 
 static void
@@ -369,14 +353,8 @@ read_syscall (struct intr_frame *f, uint32_t* args, struct thread* trd)
   if (!check_fd (trd, fd) || fd == 1)
       EXIT_WITH_ERROR;
 
-  if (trd->file_descriptors[fd].file == NULL)
-  {
-    f->eax = -1;
-    return;
-  }
-
   lock_acquire(&global_lock);
-  f->eax = file_read (trd->file_descriptors[fd].file, buffer, length);
+  f->eax = file_read (trd->file_descriptors[fd], buffer, length);
   lock_release(&global_lock);
 }
 
@@ -401,7 +379,7 @@ write_syscall (struct intr_frame *f, uint32_t* args, struct thread* trd)
       EXIT_WITH_ERROR;
 
   lock_acquire(&global_lock);
-  f->eax = file_write (trd->file_descriptors[fd].file, buffer, length);
+  f->eax = file_write (trd->file_descriptors[fd], buffer, length);
   lock_release(&global_lock);
 }
 
@@ -417,14 +395,8 @@ filesize_syscall (struct intr_frame *f, uint32_t* args, struct thread* trd)
   if (!check_fd(trd, fd) || fd == 0 || fd == 1)
       EXIT_WITH_ERROR;
 
-  if (trd->file_descriptors[fd].file == NULL)
-  {
-    f->eax = -1;
-    return;
-  }
-
   lock_acquire(&global_lock);
-  f->eax = file_length (trd->file_descriptors[fd].file);
+  f->eax = file_length (trd->file_descriptors[fd]);
   lock_release(&global_lock);
 }
 
@@ -438,15 +410,9 @@ tell_syscall (struct intr_frame *f, uint32_t* args, struct thread* trd)
   /* Fail when tell of a wrong fd or standard input or standard output */
   if (!check_fd (trd, fd) || fd == 0 || fd == 1)
       EXIT_WITH_ERROR;
-
-  if (trd->file_descriptors[fd].file == NULL)
-  {
-    f->eax = -1;
-    return;
-  }
-
+  
   lock_acquire(&global_lock);
-  f->eax = file_tell (trd->file_descriptors[fd].file);
+  f->eax = file_tell (trd->file_descriptors[fd]);
   lock_release(&global_lock);
 }
 
@@ -461,15 +427,9 @@ seek_syscall (struct intr_frame *f, uint32_t* args, struct thread* trd)
   /* Fail when seek of a wrong fd or standard input or standard output */
   if (!check_fd (trd, fd) || fd == 0 || fd == 1)
       EXIT_WITH_ERROR;
-
-  if (trd->file_descriptors[fd].file == NULL)
-  {
-    f->eax = -1;
-    return;
-  }
   
   lock_acquire(&global_lock);
-  file_seek (trd->file_descriptors[fd].file, position);
+  file_seek (trd->file_descriptors[fd], position);
   lock_release(&global_lock);
   f->eax = 0;
 }

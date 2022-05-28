@@ -197,10 +197,8 @@ free_file_descriptors (struct thread *cur)
   int i;
   for (i = 0; i < MAX_FILE_DESCRIPTORS; i++)
     {
-      if (cur->file_descriptors[i].file != NULL)
-        file_close (cur->file_descriptors[i].file);
-      if (cur->file_descriptors[i].dir != NULL)
-        dir_close (cur->file_descriptors[i].dir);
+      if (cur->file_descriptors[i] != NULL)
+        file_close (cur->file_descriptors[i]);
     }
 }
 
@@ -359,7 +357,6 @@ load (char *file_name, void (**eip) (void), void **esp)
 {
   struct thread *t = thread_current ();
   struct Elf32_Ehdr ehdr;
-  struct descriptor descriptor = {NULL, NULL};
   struct file *file = NULL;
   off_t file_ofs;
   bool success = false;
@@ -387,8 +384,7 @@ load (char *file_name, void (**eip) (void), void **esp)
   thread_current ()->name[15] = '\0';
 
   /* Open executable file. */
-  filesys_open (argv[0], &descriptor);
-  file = descriptor.file;
+  file = filesys_open (argv[0]);
   t->process_file = file;
   if (file == NULL)
     {

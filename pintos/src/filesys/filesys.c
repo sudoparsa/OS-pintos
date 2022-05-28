@@ -66,11 +66,12 @@ filesys_create (const char *path, off_t initial_size, bool directory)
   return success;
 }
 /* Opens the file with the given NAME.
-   Puts the file/directory in the given `descriptor`.
+   Returns the new file if successful or a null pointer
+   otherwise.
    Fails if no file named NAME exists,
    or if an internal memory allocation fails. */
-void
-filesys_open (const char *path, struct descriptor *descriptor)
+struct file *
+filesys_open (const char *path)
 {
   char tail[NAME_MAX + 1];
   struct dir *dir = NULL;
@@ -81,11 +82,7 @@ filesys_open (const char *path, struct descriptor *descriptor)
     dir_lookup (dir, tail, &inode);
   dir_close (dir);
 
-  struct inode_disk *inode_disk = get_inode_disk (inode);
-  if (inode_disk_isdir (inode_disk))
-    descriptor->dir = dir_open(inode);
-  else
-    descriptor->file = file_open (inode);
+  return file_open (inode);
 }
 
 /* Deletes the file named NAME.

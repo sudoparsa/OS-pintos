@@ -39,9 +39,7 @@ fsutil_cat (char **argv)
   char *buffer;
 
   printf ("Printing '%s' to the console...\n", file_name);
-  struct descriptor descriptor;
-  filesys_open (file_name, &descriptor);
-  file = descriptor.file;
+  file = filesys_open (file_name);
   if (file == NULL)
     PANIC ("%s: open failed", file_name);
   buffer = palloc_get_page (PAL_ASSERT);
@@ -122,9 +120,7 @@ fsutil_extract (char **argv UNUSED)
           /* Create destination file. */
           if (!filesys_create (file_name, size, false))
             PANIC ("%s: create failed", file_name);
-          struct descriptor descriptor;
-          filesys_open (file_name, &descriptor);
-          dst = descriptor.file;
+          dst = filesys_open (file_name);
           if (dst == NULL)
             PANIC ("%s: open failed", file_name);
 
@@ -186,9 +182,7 @@ fsutil_append (char **argv)
     PANIC ("couldn't allocate buffer");
 
   /* Open source file. */
-  struct descriptor descriptor;
-  filesys_open (file_name, &descriptor);
-  src = descriptor.file;
+  src = filesys_open (file_name);
   if (src == NULL)
     PANIC ("%s: open failed", file_name);
   size = file_length (src);

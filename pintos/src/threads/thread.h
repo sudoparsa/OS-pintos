@@ -6,7 +6,6 @@
 #include <stdint.h>
 #include "threads/synch.h"
 #include "threads/fixed-point.h"
-#include "filesys/filesys.h"
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -28,7 +27,7 @@ typedef int pid_t;
 #define PRI_DEFAULT 31                  /* Default priority. */
 #define PRI_MAX 63                      /* Highest priority. */
 
-#define MAX_FILE_DESCRIPTORS   64
+#define MAX_FILE_DESCRIPTORS   128
 
 /* A kernel thread or user process.
 
@@ -132,7 +131,7 @@ struct thread
 #endif
 
     /* Owned by userprog/syscall.c */
-    struct descriptor file_descriptors[MAX_FILE_DESCRIPTORS];
+    struct file* file_descriptors[MAX_FILE_DESCRIPTORS];
     struct file* process_file;
     struct dir *cwd;
     struct list children;
