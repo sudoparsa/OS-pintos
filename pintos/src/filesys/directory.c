@@ -71,7 +71,11 @@ dir_divide_path(struct dir **parent, char *tail, const char *path)
     if (thread_current ()->cwd == NULL)
       *parent = dir_open_root ();
     else
+    {
+      if (inode_get_removed(thread_current ()->cwd->inode))
+        goto failed;
       *parent = dir_reopen (thread_current ()->cwd);
+    }
   }
 
   *tail = '\0';

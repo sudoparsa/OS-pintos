@@ -88,11 +88,12 @@ filesys_open (const char *path)
     dir_lookup (dir, tail, &inode);
   dir_close (dir);
 
-  if (inode == NULL)
+  if (inode == NULL || inode_get_removed(inode))
   {
     // printf("path: `%s`\n", path);
     return NULL;
   }
+
   struct file* res;
   if (inode_isdir (inode))
   {
