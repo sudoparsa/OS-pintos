@@ -155,7 +155,7 @@ check_directory (struct dir *dir)
   struct dir_entry e;
   off_t ofs;
 
-  for (ofs = 2 * sizeof e; inode_read_at (dir->inode, &e, sizeof e, ofs) == sizeof e;
+  for (ofs = 1 * sizeof e; inode_read_at (dir->inode, &e, sizeof e, ofs) == sizeof e;
        ofs += sizeof e)
       if (e.in_use)
         return false;
@@ -169,23 +169,21 @@ bool
 dir_create (block_sector_t sector, size_t entry_cnt)
 {
   // this should be checked
-  if (!inode_create (sector, (entry_cnt + 2) * sizeof (struct dir_entry), true))
+  if (!inode_create (sector, (entry_cnt) * sizeof (struct dir_entry), true))
     return false;
   
   struct inode *dir_inode = inode_open (sector);
-
   struct dir_entry parent_entry = get_new_entry (sector, "..");
-  struct dir_entry current_entry = get_new_entry (sector, ".");
+  // struct dir_entry current_entry = get_new_entry (sector, ".");
 
   bool success;
   success = inode_write_at (dir_inode, &parent_entry, 
-            sizeof (struct dir_entry), 0) == sizeof (struct dir_entry);
+            sizeof parent_entry, 0) == sizeof parent_entry;
 
-  success &= inode_write_at (dir_inode, &current_entry, 
-            sizeof (struct dir_entry), sizeof (struct dir_entry)) == sizeof (struct dir_entry);
+  // success &= inode_write_at (dir_inode, &current_entry, 
+  //            sizeof current_entry, sizeof parent_entry) == sizeof current_entry;
 
   inode_close (dir_inode);
-  
   return success;
 }
 
@@ -199,7 +197,8 @@ dir_open (struct inode *inode)
     {
       dir->inode = inode;
       /* may change because of readdir funcion. */
-      dir->pos = 2 * sizeof (struct dir_entry);
+      dir -> pos = 1 * sizeof (struct dir_entry);
+      // dir->pos = 1 * sizeof (struct dir_entry);
       return dir;
     }
   else
@@ -261,7 +260,7 @@ lookup (const struct dir *dir, const char *name,
   ASSERT (dir != NULL);
   ASSERT (name != NULL);
 
-  for (ofs = 0; inode_read_at (dir->inode, &e, sizeof e, ofs) == sizeof e;
+  for (ofs = 1 * sizeof (struct dir_entry) ; inode_read_at (dir->inode, &e, sizeof e, ofs) == sizeof e;
        ofs += sizeof e)
     if (e.in_use && !strcmp (name, e.name))
       {
@@ -286,8 +285,14 @@ dir_lookup (const struct dir *dir, const char *name,
 
   ASSERT (dir != NULL);
   ASSERT (name != NULL);
-
-  if (lookup (dir, name, &e, NULL))
+  if (strcmp (name, "..") == 0)
+    {
+      inode_read_at (dir->inode, &e, sizeof e, 0);
+      *inode = inode_open (e.inode_sector);
+    }
+  else if (strcmp (name, ".") == 0)
+    *inode = inode_reopen (dir->inode);
+  else if (lookup (dir, name, &e, NULL))
     *inode = inode_open (e.inode_sector);
   else
     *inode = NULL;
@@ -327,18 +332,16 @@ dir_add (struct dir *dir, const char *name, block_sector_t inode_sector)
   if (inode_disk_isdir (get_inode_disk (dir_inode)))
     {
       struct dir_entry child_entry;
-
       child_entry = get_new_entry (inode_get_inumber (dir_get_inode (dir)), "..");
-
       /* error happened while writing at child directory */
-      if (inode_write_at (dir_inode, &child_entry, sizeof (struct dir_entry), 0)
-            != sizeof (struct dir_entry))
+      if (inode_write_at (dir_inode, &child_entry, sizeof child_entry, 0)
+            != sizeof child_entry)
         {
           inode_close (dir_inode);
           return false;
         }
-      inode_close (dir_inode);
     }
+    inode_close (dir_inode);
 
   /* Set OFS to offset of free slot.
      If there are no free slots, then it will be set to the
@@ -347,7 +350,7 @@ dir_add (struct dir *dir, const char *name, block_sector_t inode_sector)
      inode_read_at() will only return a short read at end of file.
      Otherwise, we'd need to verify that we didn't get a short
      read due to something intermittent such as low memory. */
-  for (ofs = 0; inode_read_at (dir->inode, &e, sizeof e, ofs) == sizeof e;
+  for (ofs = 1 * sizeof (struct dir_entry); inode_read_at (dir->inode, &e, sizeof e, ofs) == sizeof e;
        ofs += sizeof e)
     if (!e.in_use)
       break;
@@ -425,8 +428,7 @@ dir_readdir (struct dir *dir, char name[NAME_MAX + 1])
           return true;
         }
     }
-
-  dir->pos = 2 * sizeof e;
+  dir->pos = 1 * sizeof (struct dir_entry);
   return false;
 }
 
