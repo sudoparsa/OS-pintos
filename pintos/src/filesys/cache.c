@@ -22,6 +22,16 @@ cache_init (void)
     }
 }
 
+void 
+cache_shutdown (struct block *fs_device)
+{
+  for (int i=0; i<CACHE_SIZE; i++)
+    {
+      if (cache[i].valid == true && cache[i].dirty == true)
+         flush_block (fs_device, &cache[i]);
+    }
+
+}
 
 void
 flush_block (struct block *fs_device, struct cache_block *LRU_block)
@@ -81,7 +91,9 @@ cache_read (struct block *fs_device, block_sector_t sector_idx, void *buffer, of
 {
   ASSERT (fs_device != NULL);
   ASSERT (offset >= 0 && chunk_size >= 0 && (offset + chunk_size) <= BLOCK_SECTOR_SIZE);
+  ASSERT(sector_idx < block_size(fs_device));
 
+  
   struct cache_block* cb = get_cache_block(fs_device, sector_idx);
   lock_acquire(&cb->cache_lock);
   memcpy(buffer, &(cb->data[offset]), chunk_size);
@@ -94,6 +106,7 @@ void cache_write (struct block *fs_device, block_sector_t sector_idx, void *buff
 {        
   ASSERT (fs_device != NULL);
   ASSERT (offset >= 0 && chunk_size >= 0 && (offset + chunk_size) <= BLOCK_SECTOR_SIZE);
+
 
   struct cache_block* cb = get_cache_block (fs_device, sector_idx);
   lock_acquire(&cb->cache_lock);

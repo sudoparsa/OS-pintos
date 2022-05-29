@@ -27,6 +27,7 @@ struct lock cache_list_lock;
 
 
 void cache_init (void);
+void cache_shutdown (struct block *fs_device);
 void cache_read (struct block *fs_device, block_sector_t sector_idx, void *buffer, off_t offset, int chunk_size);
 void cache_write (struct block *fs_device, block_sector_t sector_idx, void *buffer, off_t offset, int chunk_size);
 void flush_block (struct block *fs_device, struct cache_block *LRU_block);
