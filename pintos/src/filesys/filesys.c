@@ -82,16 +82,15 @@ filesys_open (const char *path)
 
   char tail[NAME_MAX + 1];
   struct dir *dir = NULL;
-  dir_divide_path(&dir, tail, path);
+  dir_divide_path (&dir, tail, path);
   struct inode *inode = NULL;
 
   if (dir != NULL)
     dir_lookup (dir, tail, &inode);
   dir_close (dir);
 
-  if (inode == NULL || inode_get_removed(inode))
+  if (inode == NULL)
   {
-    // printf("path: `%s`\n", path);
     return NULL;
   }
 
@@ -114,7 +113,7 @@ filesys_remove (const char *path)
 {
   char tail[NAME_MAX + 1];
   struct dir *dir = NULL;
-  dir_divide_path(&dir, tail, path);
+  dir_divide_path (&dir, tail, path);
   
   bool success = dir != NULL && dir_remove (dir, tail);
   dir_close (dir);

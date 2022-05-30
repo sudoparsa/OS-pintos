@@ -178,14 +178,11 @@ dir_create (block_sector_t sector, size_t entry_cnt)
   
   struct inode *dir_inode = inode_open (sector);
   struct dir_entry parent_entry = get_new_entry (sector, "..");
-  // struct dir_entry current_entry = get_new_entry (sector, ".");
 
   bool success;
   success = inode_write_at (dir_inode, &parent_entry, 
             sizeof parent_entry, 0) == sizeof parent_entry;
 
-  // success &= inode_write_at (dir_inode, &current_entry, 
-  //            sizeof current_entry, sizeof parent_entry) == sizeof current_entry;
 
   inode_close (dir_inode);
   return success;
@@ -202,7 +199,6 @@ dir_open (struct inode *inode)
       dir->inode = inode;
       /* may change because of readdir funcion. */
       dir -> pos = 1 * sizeof (struct dir_entry);
-      // dir->pos = 1 * sizeof (struct dir_entry);
       return dir;
     }
   else
@@ -360,9 +356,7 @@ dir_add (struct dir *dir, const char *name, block_sector_t inode_sector)
       break;
 
   /* Write slot. */
-  // e.in_use = true;
-  // strlcpy (e.name, name, sizeof e.name);
-  // e.inode_sector = inode_sector;
+
   e = get_new_entry (inode_sector, name);
   success = inode_write_at (dir->inode, &e, sizeof e, ofs) == sizeof e;
 
@@ -445,7 +439,7 @@ dir_from_file (struct file *file)
   if (file == NULL)
     return NULL;
 
-  struct inode *inode = file_get_inode(file);
+  struct inode *inode = file_get_inode (file);
 
   if (inode == NULL)
     return NULL;

@@ -21,9 +21,9 @@
 struct inode_disk *get_inode_disk (const struct inode *);
 static bool inode_disk_allocate (struct inode_disk *disk_inode, off_t length);
 static bool allocate_sector (block_sector_t *sector_idx);
-static bool allocate_indirect(block_sector_t sector_idx, size_t num_sectors_to_allocate);
+static bool allocate_indirect (block_sector_t sector_idx, size_t num_sectors_to_allocate);
 static bool inode_disk_deallocate (struct inode *inode);
-static bool deallocate_indirect(block_sector_t sector_num, size_t num_sectors_to_allocate);
+static bool deallocate_indirect (block_sector_t sector_num, size_t num_sectors_to_allocate);
 /* On-disk inode.
    Must be exactly BLOCK_SECTOR_SIZE bytes long. */
 struct inode_disk
@@ -67,7 +67,7 @@ struct inode_disk *
 get_inode_disk (const struct inode *inode)
 {
   struct inode_disk *id = malloc ( sizeof *id);
-  cache_read(fs_device, inode->sector, (void *)id, 0, BLOCK_SECTOR_SIZE);
+  cache_read (fs_device, inode->sector, (void *)id, 0, BLOCK_SECTOR_SIZE);
   return id;
 }
 
@@ -80,20 +80,22 @@ byte_to_sector (const struct inode *inode, off_t pos)
 {
   ASSERT (inode != NULL);
 
-  struct inode_disk *id = get_inode_disk(inode);
+  struct inode_disk *id = get_inode_disk (inode);
   block_sector_t res = -1;
-  if (pos >= id->length){
-    free(id);
+  if (pos >= id->length)
+    {
+      free (id);
       return res;
-  }
+    }
 
   
   off_t block_idx = pos / BLOCK_SECTOR_SIZE;
-  if (pos < DIRECT_BLOCK_NO * BLOCK_SECTOR_SIZE){
+  if (pos < DIRECT_BLOCK_NO * BLOCK_SECTOR_SIZE)
+    {
       res = id->direct[block_idx];
       free (id);
       return res;
-  }
+    }
 
   else if (pos < (DIRECT_BLOCK_NO + INDIRECT_BLOCK_NO) * BLOCK_SECTOR_SIZE)
     {
@@ -178,7 +180,7 @@ inode_disk_allocate (struct inode_disk *disk_inode, off_t length)
       return false;
 
   if (!allocate_indirect(disk_inode->indirect,num_sectors_to_allocate))
-  return false;
+    return false;
   if (num_sectors_to_allocate > INDIRECT_BLOCK_NO)
     num_sectors_to_allocate -= INDIRECT_BLOCK_NO;
   else
@@ -203,7 +205,7 @@ inode_disk_allocate (struct inode_disk *disk_inode, off_t length)
       else
         chunk_size = INDIRECT_BLOCK_NO;
       if (dblocks[i] == UNALLOCATED)
-        if(!allocate_sector(&dblocks[i]))
+        if(!allocate_sector (&dblocks[i]))
           return false;
       if (!allocate_indirect (dblocks[i], chunk_size))
         return false;
@@ -215,7 +217,7 @@ inode_disk_allocate (struct inode_disk *disk_inode, off_t length)
   if (num_sectors_to_allocate <= INDIRECT_BLOCK_NO * INDIRECT_BLOCK_NO)
     return true;
   return false;
-  ASSERT(num_sectors_to_allocate == 0);
+  ASSERT (num_sectors_to_allocate == 0);
   return false;
 }
 
@@ -420,7 +422,7 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
   if (inode->deny_write_cnt)
     return 0;
 
-  lock_acquire(&inode->f_lock);
+  lock_acquire (&inode->f_lock);
 
   if (byte_to_sector (inode, offset + size-1) == (size_t) -1)
    {
@@ -509,11 +511,11 @@ inode_disk_deallocate (struct inode *inode)
   num_sectors_to_allocate -= i;
   if (num_sectors_to_allocate == 0)
     {
-      free(disk_inode);
+      free (disk_inode);
       return true;
     }
 
-  if (!deallocate_indirect(disk_inode->indirect, num_sectors_to_allocate))
+  if (!deallocate_indirect (disk_inode->indirect, num_sectors_to_allocate))
     return false;
   i = num_sectors_to_allocate < INDIRECT_BLOCK_NO ? num_sectors_to_allocate : INDIRECT_BLOCK_NO;
   num_sectors_to_allocate -= i;
@@ -536,25 +538,25 @@ inode_disk_deallocate (struct inode *inode)
       cache_read (fs_device, blocks[i], &double_indirect_blocks, 0, BLOCK_SECTOR_SIZE);
       size_t j;
       for (j = 0; j < num_sectors_to_allocate && j < INDIRECT_BLOCK_NO; j++)
-        free_map_release(double_indirect_blocks[j],1); 
-      free_map_release(blocks[i], 1);
+        free_map_release (double_indirect_blocks[j], 1); 
+      free_map_release (blocks[i], 1);
       num_sectors_to_allocate -= j;
     }
-  free_map_release(disk_inode->double_indirect, 1);
-  free(disk_inode);
+  free_map_release (disk_inode->double_indirect, 1);
+  free (disk_inode);
   return true;
 }
 
-static bool deallocate_indirect(block_sector_t sector_num, size_t num_sectors_to_allocate)
+static bool deallocate_indirect (block_sector_t sector_num, size_t num_sectors_to_allocate)
 {
   block_sector_t indirect_blocks[INDIRECT_BLOCK_NO];
   cache_read (fs_device, sector_num, &indirect_blocks, 0, BLOCK_SECTOR_SIZE);
   for (size_t i = 0; i < num_sectors_to_allocate && i < INDIRECT_BLOCK_NO; i++)
-    free_map_release(indirect_blocks[i],1);
-  free_map_release(sector_num,1);
+    free_map_release (indirect_blocks[i], 1);
+  free_map_release (sector_num, 1);
   return true;
 }
-struct lock *inode_lock(struct inode *inode)
+struct lock *inode_lock (struct inode *inode)
 {
   ASSERT (inode);
   return &(inode->f_lock);
