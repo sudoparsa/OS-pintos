@@ -209,6 +209,18 @@ cache_miss (void)
   return syscall0 (SYS_CACHE_MISS);
 }
 
+uint32_t
+cache_write_count (void)
+{
+  return syscall0 (SYS_CACHE_WRITE_CNT);
+}
+
+uint32_t
+cache_read_count (void)
+{
+  return syscall0 (SYS_CACHE_READ_CNT);
+}
+
 void*
 sbrk (intptr_t increment)
 {

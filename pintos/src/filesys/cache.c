@@ -11,6 +11,8 @@ struct cache_stat
 {
   size_t hit_count;
   size_t miss_count;
+  size_t write_count;
+  size_t read_count;
 };
 
 static struct cache_stat cache_stat;
@@ -29,7 +31,7 @@ cache_init (void)
       list_push_back (&cache_LRU, &(cache[i].cache_elem));
     }
 
-  cache_stat = (struct cache_stat) {0, 0};
+  cache_stat = (struct cache_stat) {0, 0, 0, 0};
 }
 
 void 
@@ -45,6 +47,8 @@ cache_shutdown (struct block *fs_device)
 void
 flush_block (struct block *fs_device, struct cache_block *LRU_block)
 {
+  ++ cache_stat.write_count;
+
   block_write(fs_device, LRU_block->sector_num, LRU_block->data);
   LRU_block->dirty = false;
 }
@@ -61,7 +65,7 @@ get_cache_index(block_sector_t sector)
 
 
 struct cache_block *
-get_cache_block (struct block *fs_device, block_sector_t sector)
+get_cache_block (struct block *fs_device, block_sector_t sector, bool retrieve)
 {
   int index = get_cache_index (sector);
   struct cache_block* LRU_block;
@@ -75,7 +79,12 @@ get_cache_block (struct block *fs_device, block_sector_t sector)
       if (LRU_block->valid && LRU_block->dirty)
         flush_block (fs_device, LRU_block);
 
-      block_read (fs_device, sector, LRU_block->data);
+      if (retrieve)
+      {
+        ++ cache_stat.read_count;
+        block_read(fs_device, sector, LRU_block->data);
+      }
+
       LRU_block->valid = true;
       LRU_block->dirty = false;
       LRU_block->sector_num = sector;
@@ -105,7 +114,7 @@ cache_read (struct block *fs_device, block_sector_t sector_idx, void *buffer, of
   ASSERT(sector_idx < block_size(fs_device));
 
   
-  struct cache_block* cb = get_cache_block(fs_device, sector_idx);
+  struct cache_block* cb = get_cache_block(fs_device, sector_idx, true);
   lock_acquire(&cb->cache_lock);
   memcpy(buffer, &(cb->data[offset]), chunk_size);
 
@@ -119,7 +128,11 @@ void cache_write (struct block *fs_device, block_sector_t sector_idx, void *buff
   ASSERT (offset >= 0 && chunk_size >= 0 && (offset + chunk_size) <= BLOCK_SECTOR_SIZE);
 
 
-  struct cache_block* cb = get_cache_block (fs_device, sector_idx);
+  struct cache_block* cb;
+  if (offset == 0 && chunk_size >= BLOCK_SECTOR_SIZE)
+    cb = get_cache_block (fs_device, sector_idx, false);
+  else
+    cb = get_cache_block (fs_device, sector_idx, true);
   lock_acquire(&cb->cache_lock);
   memcpy(&(cb->data[offset]), buffer, chunk_size);
   cb->dirty = true;
@@ -137,7 +150,7 @@ cache_invalidate (struct block *fs_device)
     cache[i].dirty = false;
   }
 
-  cache_stat = (struct cache_stat) {0, 0};
+  cache_stat = (struct cache_stat) {0, 0, 0, 0};
 }
 
 
@@ -147,8 +160,23 @@ cache_hit_count (void)
   return cache_stat.hit_count;
 }
 
+
 size_t
 cache_miss_count (void)
 {
   return cache_stat.miss_count;
+}
+
+
+size_t
+cache_write_count (void)
+{
+  return cache_stat.write_count;
+}
+
+
+size_t
+cache_read_count (void)
+{
+  return cache_stat.read_count;
 }

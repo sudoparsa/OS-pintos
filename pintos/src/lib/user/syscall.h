@@ -51,6 +51,8 @@ int inumber (int fd);
 void invalidate_cache (void);
 uint32_t cache_hit (void);
 uint32_t cache_miss (void);
+uint32_t cache_read_count (void);
+uint32_t cache_write_count (void);
 
 /* Homework 5, Part B. */
 void* sbrk (intptr_t increment);

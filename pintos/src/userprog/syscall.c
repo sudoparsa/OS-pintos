@@ -44,6 +44,8 @@ static void inumber_syscall (struct intr_frame *, uint32_t*, struct thread*);
 static void cache_invalidate_syscall (void);
 static void cache_hit_syscall (struct intr_frame *);
 static void cache_miss_syscall (struct intr_frame *);
+static void cache_write_count_syscall (struct intr_frame *);
+static void cache_read_count_syscall (struct intr_frame *);
 
 void
 syscall_init (void)
@@ -240,6 +242,12 @@ syscall_handler (struct intr_frame *f)
         break;
       case SYS_CACHE_MISS:
         cache_miss_syscall (f);
+        break;
+      case SYS_CACHE_WRITE_CNT:
+        cache_write_count_syscall (f);
+        break;
+      case SYS_CACHE_READ_CNT:
+        cache_read_count_syscall (f);
         break;
       default:
         break;
@@ -532,4 +540,16 @@ static void
 cache_miss_syscall (struct intr_frame *f)
 {
   f->eax = cache_miss_count ();
+}
+
+static void
+cache_write_count_syscall (struct intr_frame *f)
+{
+  f->eax = cache_write_count ();
+}
+
+static void
+cache_read_count_syscall (struct intr_frame *f)
+{
+  f->eax = cache_read_count ();
 }

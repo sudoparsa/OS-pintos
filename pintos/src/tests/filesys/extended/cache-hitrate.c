@@ -13,8 +13,6 @@
 
 char buf[FILE_SIZE];
 
-float benchmark (int fd, size_t size);
-
 void
 test_main (void)
 {
