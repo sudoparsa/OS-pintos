@@ -72,6 +72,29 @@ struct lock cache_list_lock;
 را اضافه کردیم که قبل از خاموش شدن تغییرات در حافظه اصلی هم اعمال شوند.
 
 ## تست‌های پیاده‌سازی شده
+
+
+```c
+// cache.c
+struct cache_stat
+{
+  size_t hit_count;
+  size_t miss_count;
+  size_t write_count;
+  size_t read_count;
+};
+
+static struct cache_stat cache_stat;
+
+// cache.h
+void cache_invalidate (struct block *fs_device);
+
+size_t cache_hit_count (void);
+size_t cache_miss_count (void);
+size_t cache_write_count (void);
+size_t cache_read_count (void);
+```
+
 برای تست‌ها ابتدا ۵ تا
 `syscall`
 اضافه کردیم که بتوان کش را
@@ -79,6 +102,7 @@ struct lock cache_list_lock;
 کرد و تعداد
 `read, write, hit, miss`
 را گزارش کرد.
+سپس موارد بالا را اضافه کردیم که بتوانیم اعداد گفته شده را حساب کنیم.
 
 تست
 `cache-hitrate`: 
@@ -105,7 +129,7 @@ struct lock cache_list_lock;
 که سیستم خاموش می‌شد را هم اضافه کردیم.
 
 
-خروجی تست‌ها
+`خروجی تست‌ها`
 
 ‍‍`cache-hitrate.output`
 
@@ -281,7 +305,36 @@ Copying tests/filesys/extended/cache-write.tar out of /tmp/r1tE5fI0_c.dsk...
 PASS
 
 
+`ایرادهای بالقوه هسته`
 
+اگر هسته همیشه وقتی بخواهد یک بلاک را بنویسد اول از مموری بلاک را بگیرد،
+آن وقت تعداد
+`read‍‍`
+ها زیاد شده و تست
+`cache-write`
+پاس نمی‌شود. ما در هسته چک کرده‌ایم که اگر قرار است نوشتن اتفاق بیافتد
+`read`
+الکی نداشته باشیم.
+
+اگر هسته مقادیر اشتباهی برای
+`hit_count, miss_count, write_count, read_count`
+برگرداند اصلا اعتبار تست‌ها زیر سوال می‌رود. دقت کنید که هر دو تست کاملا به صحت این اعداد وابسته‌اند.
+
+اگر در هسته آپدیت شدن بلاک‌ها با کش نباشد، تست
+`cache-hitrate`
+فیل می‌شود چرا که بدون کش حالت اول و دوم خواندن فرقی نمی‌کند.
+
+
+`تجربه تست نوشتن`
+
+تست نوشتن
+`Pintos`
+هم لذت‌بخش بود. تنها کافی بود یک کلمه به
+`Make`
+اضافه شده و بعد فایل‌های مربوط به تست را زد. خود فایل تست هم با توجه به تابع‌های آماده‌ای که
+وجود داشت بسیار تمیز و ساده‌تر بود و تمرکزش روی خود سناریو تست بود با حداقل
+`duplicate`
+ممکن
 
 # فایل‌های قابل گسترش
 ## داده ساختار ها
