@@ -10,6 +10,7 @@
 #include "filesys/filesys.h"
 #include "filesys/inode.h"
 #include "filesys/directory.h"
+#include "filesys/cache.h"
 #include "devices/input.h"
 #include "devices/shutdown.h"
 #include "userprog/process.h"
@@ -40,6 +41,9 @@ static void mkdir_syscall (struct intr_frame *, uint32_t*);
 static void readdir_syscall (struct intr_frame *, uint32_t*, struct thread*);
 static void isdir_syscall (struct intr_frame *, uint32_t*, struct thread*);
 static void inumber_syscall (struct intr_frame *, uint32_t*, struct thread*);
+static void cache_invalidate_syscall (void);
+static void cache_hit_syscall (struct intr_frame *);
+static void cache_miss_syscall (struct intr_frame *);
 
 void
 syscall_init (void)
@@ -227,6 +231,15 @@ syscall_handler (struct intr_frame *f)
         break;
       case SYS_INUMBER:                // Returns the inode number for a fd.
         inumber_syscall (f, args, trd);
+        break;
+      case SYS_CACHE_INVALIDATE:
+        cache_invalidate_syscall ();
+        break;
+      case SYS_CACHE_HIT:
+        cache_hit_syscall (f);
+        break;
+      case SYS_CACHE_MISS:
+        cache_miss_syscall (f);
         break;
       default:
         break;
@@ -501,4 +514,22 @@ inumber_syscall (struct intr_frame *f, uint32_t* args, struct thread* trd)
     EXIT_WITH_ERROR;
 
   f->eax = inode_get_inumber (inode);
+}
+
+static void
+cache_invalidate_syscall (void)
+{
+  cache_invalidate (fs_device);
+}
+
+static void
+cache_hit_syscall (struct intr_frame *f)
+{
+  f->eax = cache_hit_count ();
+}
+
+static void
+cache_miss_syscall (struct intr_frame *f)
+{
+  f->eax = cache_miss_count ();
 }

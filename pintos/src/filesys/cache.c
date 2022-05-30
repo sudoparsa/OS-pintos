@@ -7,6 +7,14 @@
 #define NOTFOUND -1 
 
 
+struct cache_stat
+{
+  size_t hit_count;
+  size_t miss_count;
+};
+
+static struct cache_stat cache_stat;
+
 void
 cache_init (void)
 {
@@ -20,6 +28,8 @@ cache_init (void)
       cache[i].valid = false;
       list_push_back (&cache_LRU, &(cache[i].cache_elem));
     }
+
+  cache_stat = (struct cache_stat) {0, 0};
 }
 
 void 
@@ -30,7 +40,6 @@ cache_shutdown (struct block *fs_device)
       if (cache[i].valid == true && cache[i].dirty == true)
          flush_block (fs_device, &cache[i]);
     }
-
 }
 
 void
@@ -59,6 +68,7 @@ get_cache_block (struct block *fs_device, block_sector_t sector)
   lock_acquire (&cache_list_lock);
   if (index == NOTFOUND)
     {
+      ++ cache_stat.miss_count;
       LRU_block = list_entry (list_pop_front (&cache_LRU), struct cache_block, cache_elem);
       lock_acquire (&LRU_block->cache_lock);
 
@@ -75,6 +85,7 @@ get_cache_block (struct block *fs_device, block_sector_t sector)
     }
   else
     {
+      ++ cache_stat.hit_count;
       list_remove (&cache[index].cache_elem);
       list_push_back (&cache_LRU, &cache[index].cache_elem);
       LRU_block = &cache[index];
@@ -113,4 +124,31 @@ void cache_write (struct block *fs_device, block_sector_t sector_idx, void *buff
   memcpy(&(cb->data[offset]), buffer, chunk_size);
   cb->dirty = true;
   lock_release(&cb->cache_lock);
+}
+
+
+void
+cache_invalidate (struct block *fs_device)
+{
+  cache_shutdown (fs_device);
+  for (int i=0; i<CACHE_SIZE; i++)
+  {
+    cache[i].valid = false;
+    cache[i].dirty = false;
+  }
+
+  cache_stat = (struct cache_stat) {0, 0};
+}
+
+
+size_t
+cache_hit_count (void)
+{
+  return cache_stat.hit_count;
+}
+
+size_t
+cache_miss_count (void)
+{
+  return cache_stat.miss_count;
 }

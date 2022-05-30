@@ -47,6 +47,11 @@ bool readdir (int fd, char name[READDIR_MAX_LEN + 1]);
 bool isdir (int fd);
 int inumber (int fd);
 
+/* Cache manipulation. */
+void invalidate_cache (void);
+uint32_t cache_hit (void);
+uint32_t cache_miss (void);
+
 /* Homework 5, Part B. */
 void* sbrk (intptr_t increment);
 

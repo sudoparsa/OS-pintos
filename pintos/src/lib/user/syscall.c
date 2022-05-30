@@ -191,6 +191,24 @@ inumber (int fd)
   return syscall1 (SYS_INUMBER, fd);
 }
 
+void
+invalidate_cache (void)
+{
+  syscall0 (SYS_CACHE_INVALIDATE);
+}
+
+uint32_t
+cache_hit (void)
+{
+  return syscall0 (SYS_CACHE_HIT);
+}
+
+uint32_t
+cache_miss (void)
+{
+  return syscall0 (SYS_CACHE_MISS);
+}
+
 void*
 sbrk (intptr_t increment)
 {
