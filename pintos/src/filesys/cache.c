@@ -82,7 +82,7 @@ get_cache_block (struct block *fs_device, block_sector_t sector, bool retrieve)
       if (retrieve)
       {
         ++ cache_stat.read_count;
-        block_read(fs_device, sector, LRU_block->data);
+        block_read (fs_device, sector, LRU_block->data);
       }
 
       LRU_block->valid = true;
@@ -115,10 +115,10 @@ cache_read (struct block *fs_device, block_sector_t sector_idx, void *buffer, of
 
   
   struct cache_block* cb = get_cache_block(fs_device, sector_idx, true);
-  lock_acquire(&cb->cache_lock);
-  memcpy(buffer, &(cb->data[offset]), chunk_size);
+  lock_acquire (&cb->cache_lock);
+  memcpy (buffer, &(cb->data[offset]), chunk_size);
 
-  lock_release(&cb->cache_lock);
+  lock_release (&cb->cache_lock);
 }
 
 
@@ -133,10 +133,10 @@ void cache_write (struct block *fs_device, block_sector_t sector_idx, void *buff
     cb = get_cache_block (fs_device, sector_idx, false);
   else
     cb = get_cache_block (fs_device, sector_idx, true);
-  lock_acquire(&cb->cache_lock);
-  memcpy(&(cb->data[offset]), buffer, chunk_size);
+  lock_acquire (&cb->cache_lock);
+  memcpy (&(cb->data[offset]), buffer, chunk_size);
   cb->dirty = true;
-  lock_release(&cb->cache_lock);
+  lock_release (&cb->cache_lock);
 }
 
 
