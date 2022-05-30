@@ -93,23 +93,29 @@ dir_divide_path(struct dir **parent, char *tail, const char *path)
     if (result < 0)
       goto failed;
     else if (result == 0)
-      break;
+      {
+        inode_close (next_inode);
+        break;
+      }
+      
     else {
       if (failed_lookup)
         goto failed;
       if (next_inode) {
+
         if (inode_get_removed (next_inode))
           goto failed;
+      
         struct dir *next_dir = dir_open(next_inode);
         if (next_dir == NULL)
           goto failed;
-
+      
         dir_close (*parent);
+     
         *parent = next_dir;
       }
     }
   }
-
   return true;
 
   failed:
@@ -133,13 +139,19 @@ dir_open_by_path (const char *path)
   dir_divide_path(&parent, tail, path);
 
   struct inode *inode;
-  if (!dir_lookup (parent, tail, &inode) || inode_get_removed (inode))
+  if (!dir_lookup (parent, tail, &inode))
   {
     dir_close (parent);
     return NULL;
   }
-
-  return dir_open (inode);
+  if (inode_get_removed (inode))
+    {
+      inode_close (inode);
+      dir_close (parent);
+      return NULL;
+    }
+    
+   return dir_open (inode);
 }
 
 static struct dir_entry
@@ -389,13 +401,17 @@ dir_remove (struct dir *dir, const char *name)
 
   if (inode_isdir (inode))
     {
+    
       struct dir *t_dir = dir_open (inode);
+     
       bool empty = check_directory (t_dir);
+     
       dir_close (t_dir);
+     
       if (!empty)
         goto done;
     }
-
+ 
   /* Erase directory entry. */
   e.in_use = false;
   if (inode_write_at (dir->inode, &e, sizeof e, ofs) != sizeof e)
