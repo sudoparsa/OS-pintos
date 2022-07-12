@@ -1,11 +1,14 @@
 # OS-pintos
 ### Pintos - Operating Systems Group Project
-This was a course project taught at Sharif University OS class, based on Berkley's CS162 in spring 2022.
+This was a course project taught at Sharif University OS class in spring 2022, based on Berkley's CS162.
 
-### Contributers
+### Contributors
 Parsa   Hosseini
+
 Alireza Farashah
+
 Arman   Babaei
+
 Mahdi   Salmani
 
 ### Acknowledgements
